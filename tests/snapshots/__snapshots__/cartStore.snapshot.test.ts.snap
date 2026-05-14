@@ -1,0 +1,141 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Snapshot Tests > AI store state shape > should snapshot AI store after message exchange 1`] = `
+{
+  "executionLog": [
+    "PROCESSING_INTENT...",
+    "SYNC_COMPLETE",
+  ],
+  "isOpen": true,
+  "isProcessing": false,
+  "messageCount": 2,
+  "messageRoles": [
+    "user",
+    "ai",
+  ],
+}
+`;
+
+exports[`Snapshot Tests > AI store state shape > should snapshot initial AI store state 1`] = `
+{
+  "executionLog": [],
+  "isOpen": false,
+  "isProcessing": false,
+  "messages": [],
+}
+`;
+
+exports[`Snapshot Tests > Cart store state shape > should snapshot empty cart state 1`] = `
+{
+  "items": [],
+  "totalItems": 0,
+  "totalPrice": 0,
+}
+`;
+
+exports[`Snapshot Tests > Cart store state shape > should snapshot multi-item cart 1`] = `
+{
+  "itemCount": 3,
+  "itemIds": [
+    "burrata-salad",
+    "tagliatelle",
+    "yuzu-spritz",
+  ],
+  "totalItems": 6,
+  "totalPrice": 95,
+}
+`;
+
+exports[`Snapshot Tests > Cart store state shape > should snapshot single-item cart 1`] = `
+{
+  "firstItem": {
+    "id": "burrata-salad",
+    "name": "Burrata & Orchard Tomatoes",
+    "price": 14,
+    "quantity": 2,
+  },
+  "itemCount": 1,
+  "totalItems": 2,
+  "totalPrice": 28,
+}
+`;
+
+exports[`Snapshot Tests > applyCartDelta return shape > should snapshot return value for all-failed apply 1`] = `
+{
+  "applied": 0,
+  "failed": 2,
+  "skipped": 0,
+}
+`;
+
+exports[`Snapshot Tests > applyCartDelta return shape > should snapshot return value for mixed apply 1`] = `
+{
+  "applied": 1,
+  "failed": 1,
+  "skipped": 1,
+}
+`;
+
+exports[`Snapshot Tests > applyCartDelta return shape > should snapshot return value for successful apply 1`] = `
+{
+  "applied": 1,
+  "failed": 0,
+  "skipped": 0,
+}
+`;
+
+exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parseAIResponse output for valid response 1`] = `
+{
+  "actions": [
+    {
+      "itemId": "burrata-salad",
+      "quantity": 1,
+      "type": "ADD_ITEM",
+    },
+  ],
+  "confirmation": "Added burrata salad.",
+  "executionLog": [
+    "PROCESSING_INTENT...",
+    "VALIDATING_MENU...",
+    "UPDATING_STATE...",
+    "SYNC_COMPLETE",
+  ],
+}
+`;
+
+exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parseCartActions output for valid input 1`] = `
+[
+  {
+    "itemId": "burrata-salad",
+    "quantity": 2,
+    "type": "ADD_ITEM",
+  },
+  {
+    "itemId": "tagliatelle",
+    "type": "REMOVE_ITEM",
+  },
+  {
+    "itemId": "salmon-bowl",
+    "quantity": 3,
+    "type": "UPDATE_QUANTITY",
+  },
+]
+`;
+
+exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parseExecutionLog defaults for empty input 1`] = `
+[
+  "PROCESSING_INTENT...",
+  "VALIDATING_MENU...",
+  "UPDATING_STATE...",
+  "SYNC_COMPLETE",
+]
+`;
+
+exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parseExecutionLog for valid 4-entry log 1`] = `
+[
+  "PROCESSING_INTENT...",
+  "VALIDATING_MENU...",
+  "UPDATING_STATE...",
+  "SYNC_COMPLETE",
+]
+`;

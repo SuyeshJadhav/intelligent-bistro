@@ -5,13 +5,26 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@shared/*": [
+        "./shared/*"
       ]
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "store/**/*.ts",
+    "hooks/**/*.ts",
+    "constants/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
     ".expo/types/**/*.ts",
+    "nativewind-env.d.ts",
     "expo-env.d.ts"
   ]
 }
