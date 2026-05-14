@@ -1,5 +1,5 @@
-import { TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { TextInput, View } from 'react-native';
 
 import { THEME } from '@/constants/theme';
 
@@ -10,7 +10,7 @@ type SearchBarProps = {
 
 export function SearchBar({ value, onChangeText }: SearchBarProps) {
 	return (
-		<View className="flex-row items-center rounded-2xl border border-divider bg-surface px-4 py-[14px]">
+		<View className="flex-row items-center rounded-2xl border border-divider bg-surface px-4 h-14">
 			<Feather name="search" size={20} color={THEME.colors['muted-text']} style={{ marginRight: 12 }} />
 			<TextInput
 				value={value}

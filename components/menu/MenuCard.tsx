@@ -44,13 +44,13 @@ export function MenuCard({ item }: MenuCardProps) {
 					<Text className="font-mono text-base text-primary-text">${item.price.toFixed(2)}</Text>
 
 					{quantity > 0 ? (
-						<View className="flex-row items-center space-x-3">
+						<View className="flex-row items-center space-x-4">
 							<Pressable
 								onPress={handleDecrement}
 								className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
 								<Text className="text-xl leading-none text-primary-text">−</Text>
 							</Pressable>
-							<Text className="font-sans text-base font-semibold text-primary-text">
+							<Text className="min-w-[24px] text-center font-sans text-base font-semibold text-primary-text">
 								{quantity}
 							</Text>
 							<Pressable
@@ -62,8 +62,8 @@ export function MenuCard({ item }: MenuCardProps) {
 					) : (
 						<Pressable
 							onPress={handleAdd}
-							className="h-9 w-9 items-center justify-center rounded-full bg-primary-text">
-							<Text className="text-lg leading-none text-white">+</Text>
+							className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
+							<Text className="text-xl leading-none text-primary-text">+</Text>
 						</Pressable>
 					)}
 				</View>
