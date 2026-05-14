@@ -13,8 +13,6 @@ import {
   createCartAction,
   parseAIResponse,
   parseCartActions,
-  parseExecutionLog,
-  safeJsonParse,
   validateCartAction,
 } from "@/lib/defensiveParsing";
 import type { CartAction } from "@/lib/types";
@@ -43,67 +41,6 @@ describe("defensiveParsing", () => {
     vi.clearAllMocks();
   });
 
-  // ── safeJsonParse ────────────────────────────────────────────────────────
-
-  describe("safeJsonParse", () => {
-    it("should parse valid JSON objects", () => {
-      const result = safeJsonParse('{"key": "value"}', mockLogger);
-      expect(result).toEqual({ key: "value" });
-    });
-
-    it("should parse valid JSON arrays", () => {
-      const result = safeJsonParse('[1, 2, 3]', mockLogger);
-      expect(result).toEqual([1, 2, 3]);
-    });
-
-    it("should parse JSON primitives", () => {
-      expect(safeJsonParse('"hello"', mockLogger)).toBe("hello");
-      expect(safeJsonParse('42', mockLogger)).toBe(42);
-      expect(safeJsonParse('true', mockLogger)).toBe(true);
-      expect(safeJsonParse('null', mockLogger)).toBeNull();
-    });
-
-    it("should return null for malformed JSON", () => {
-      expect(safeJsonParse("{ this is not json }", mockLogger)).toBeNull();
-    });
-
-    it("should return null for truncated JSON", () => {
-      expect(safeJsonParse('{"incomplete":', mockLogger)).toBeNull();
-    });
-
-    it("should return null for empty string", () => {
-      expect(safeJsonParse("", mockLogger)).toBeNull();
-    });
-
-    it("should return null for non-string inputs", () => {
-      expect(safeJsonParse(null, mockLogger)).toBeNull();
-      expect(safeJsonParse(undefined, mockLogger)).toBeNull();
-      expect(safeJsonParse(42 as any, mockLogger)).toBeNull();
-      expect(safeJsonParse({} as any, mockLogger)).toBeNull();
-    });
-
-    it("should return null for markdown-fenced JSON (needs pre-cleaning)", () => {
-      // safeJsonParse does NOT strip fences — that's gemini.ts's job
-      const result = safeJsonParse("```json\n{}\n```", mockLogger);
-      expect(result).toBeNull();
-    });
-
-    it("should never throw regardless of input", () => {
-      const weirdInputs = [
-        undefined,
-        null,
-        [],
-        {},
-        Symbol("test"),
-        () => {},
-        NaN,
-        Infinity,
-      ];
-      for (const input of weirdInputs) {
-        expect(() => safeJsonParse(input as any, mockLogger)).not.toThrow();
-      }
-    });
-  });
 
   // ── validateCartAction ───────────────────────────────────────────────────
 
@@ -530,65 +467,6 @@ describe("defensiveParsing", () => {
     });
   });
 
-  // ── parseExecutionLog ────────────────────────────────────────────────────
-
-  describe("parseExecutionLog", () => {
-    const DEFAULTS: [string, string, string, string] = [
-      "PROCESSING_INTENT...",
-      "VALIDATING_MENU...",
-      "UPDATING_STATE...",
-      "SYNC_COMPLETE",
-    ];
-
-    it("should return valid 4-entry log unchanged", () => {
-      const input = [
-        "PROCESSING_INTENT...",
-        "VALIDATING_MENU...",
-        "UPDATING_STATE...",
-        "SYNC_COMPLETE",
-      ];
-      expect(parseExecutionLog(input, mockLogger)).toEqual(input);
-    });
-
-    it("should return defaults for non-array input", () => {
-      expect(parseExecutionLog(null, mockLogger)).toEqual(DEFAULTS);
-      expect(parseExecutionLog("string", mockLogger)).toEqual(DEFAULTS);
-      expect(parseExecutionLog({}, mockLogger)).toEqual(DEFAULTS);
-    });
-
-    it("should pad short arrays with defaults", () => {
-      const result = parseExecutionLog(["STEP_1"], mockLogger);
-      expect(result[0]).toBe("STEP_1");
-      expect(result[1]).toBe(DEFAULTS[1]);
-      expect(result[2]).toBe(DEFAULTS[2]);
-      expect(result[3]).toBe(DEFAULTS[3]);
-    });
-
-    it("should truncate arrays longer than 4 to exactly 4 entries", () => {
-      const result = parseExecutionLog(
-        ["a", "b", "c", "d", "e", "f"],
-        mockLogger,
-      );
-      expect(result).toHaveLength(4);
-    });
-
-    it("should replace non-string entries with defaults", () => {
-      const result = parseExecutionLog(
-        ["STEP_1", null, 42, true],
-        mockLogger,
-      );
-      expect(result[0]).toBe("STEP_1");
-      expect(result[1]).toBe(DEFAULTS[1]);
-      expect(result[2]).toBe(DEFAULTS[2]);
-      expect(result[3]).toBe(DEFAULTS[3]);
-    });
-
-    it("should always return a tuple of exactly 4 strings", () => {
-      const result = parseExecutionLog([], mockLogger);
-      expect(result).toHaveLength(4);
-      result.forEach((entry) => expect(typeof entry).toBe("string"));
-    });
-  });
 
   // ── createCartAction ─────────────────────────────────────────────────────
 

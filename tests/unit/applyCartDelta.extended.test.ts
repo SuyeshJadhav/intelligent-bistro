@@ -37,9 +37,9 @@ describe("applyCartDelta — Extended", () => {
 
   describe("Idempotency", () => {
     it("applying REMOVE_ITEM twice on same item should be idempotent", () => {
-      applyCartDelta([makeAddAction("burrata-salad", 2)]);
-      applyCartDelta([makeRemoveAction("burrata-salad")]);
-      const r2 = applyCartDelta([makeRemoveAction("burrata-salad")]);
+      applyCartDelta([makeAddAction("burrata-salad", 2)], useCartStore.getState());
+      applyCartDelta([makeRemoveAction("burrata-salad")], useCartStore.getState());
+      const r2 = applyCartDelta([makeRemoveAction("burrata-salad")], useCartStore.getState());
 
       expect(r2.applied).toBe(1); // Store silently ignores missing remove
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -47,9 +47,9 @@ describe("applyCartDelta — Extended", () => {
     });
 
     it("applying UPDATE_QUANTITY with same value twice is idempotent", () => {
-      applyCartDelta([makeAddAction("burrata-salad", 2)]);
-      applyCartDelta([makeUpdateAction("burrata-salad", 5)]);
-      applyCartDelta([makeUpdateAction("burrata-salad", 5)]); // second time same
+      applyCartDelta([makeAddAction("burrata-salad", 2)], useCartStore.getState());
+      applyCartDelta([makeUpdateAction("burrata-salad", 5)], useCartStore.getState());
+      applyCartDelta([makeUpdateAction("burrata-salad", 5)], useCartStore.getState()); // second time same
 
       expect(useCartStore.getState().totalItems).toBe(5);
       assertCartConsistency();
@@ -76,7 +76,7 @@ describe("applyCartDelta — Extended", () => {
         quantity: 1,
       }));
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
       expect(result.applied).toBe(0);
       expect(result.failed).toBe(hallucinatedIds.length);
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -85,13 +85,13 @@ describe("applyCartDelta — Extended", () => {
     it("should handle 'Add 999 burgers' — hallucinated item, extreme qty", () => {
       const result = applyCartDelta([
         { type: "ADD_ITEM", itemId: "burger", quantity: 999 },
-      ]);
+      ], useCartStore.getState());
       expect(result.failed).toBe(1);
       expect(useCartStore.getState().items).toHaveLength(0);
     });
 
     it("should handle 'Remove item that does not exist' gracefully", () => {
-      const result = applyCartDelta([makeRemoveAction("nonexistent-item")]);
+      const result = applyCartDelta([makeRemoveAction("nonexistent-item")], useCartStore.getState());
       // REMOVE_ITEM passes validation (doesn't require menu check)
       expect(result.applied).toBe(1);
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -105,7 +105,7 @@ describe("applyCartDelta — Extended", () => {
         resetCartStore();
         const result = applyCartDelta([
           { type: "ADD_ITEM", itemId, quantity: 1 },
-        ]);
+        ], useCartStore.getState());
         expect(result.applied).toBe(0);
         expect(result.failed).toBe(1);
       }
@@ -119,7 +119,7 @@ describe("applyCartDelta — Extended", () => {
       const result = applyCartDelta([
         makeAddAction("burrata-salad", 2),
         makeRemoveAction("burrata-salad"),
-      ]);
+      ], useCartStore.getState());
       expect(result.applied).toBe(2);
       expect(useCartStore.getState().items).toHaveLength(0);
       assertCartConsistency();
@@ -129,7 +129,7 @@ describe("applyCartDelta — Extended", () => {
       applyCartDelta([
         makeAddAction("burrata-salad", 2),
         makeUpdateAction("burrata-salad", 0),
-      ]);
+      ], useCartStore.getState());
       expect(useCartStore.getState().items).toHaveLength(0);
       assertCartConsistency();
     });
@@ -139,7 +139,7 @@ describe("applyCartDelta — Extended", () => {
         makeAddAction("burrata-salad", 1),
         makeAddAction("burrata-salad", 1),
         makeAddAction("burrata-salad", 1),
-      ]);
+      ], useCartStore.getState());
       expect(useCartStore.getState().totalItems).toBe(3);
       expect(useCartStore.getState().items).toHaveLength(1);
       assertCartConsistency();
@@ -155,7 +155,7 @@ describe("applyCartDelta — Extended", () => {
         itemId: item.id,
         quantity: 1,
       }));
-      applyCartDelta(actions);
+      applyCartDelta(actions, useCartStore.getState());
 
       const expectedTotal = MENU_ITEMS.reduce((acc, item) => acc + item.price, 0);
       expect(useCartStore.getState().totalPrice).toBeCloseTo(expectedTotal, 2);
@@ -163,13 +163,13 @@ describe("applyCartDelta — Extended", () => {
     });
 
     it("should correctly compute total for 3 steak frites at $34 each = $102", () => {
-      applyCartDelta([makeAddAction("steak-frites", 3)]);
+      applyCartDelta([makeAddAction("steak-frites", 3)], useCartStore.getState());
       expect(useCartStore.getState().totalPrice).toBeCloseTo(102, 2);
     });
 
     it("should recalculate total correctly after quantity update", () => {
-      applyCartDelta([makeAddAction("salmon-bowl", 2)]); // 2 * $28 = $56
-      applyCartDelta([makeUpdateAction("salmon-bowl", 1)]); // 1 * $28 = $28
+      applyCartDelta([makeAddAction("salmon-bowl", 2)], useCartStore.getState()); // 2 * $28 = $56
+      applyCartDelta([makeUpdateAction("salmon-bowl", 1)], useCartStore.getState()); // 1 * $28 = $28
       expect(useCartStore.getState().totalPrice).toBeCloseTo(28, 2);
       assertCartConsistency();
     });
@@ -185,7 +185,7 @@ describe("applyCartDelta — Extended", () => {
         true as any,
         makeAddAction("burrata-salad", 1),
       ];
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
       expect(result.applied).toBe(1);
       expect(result.skipped).toBe(3);
     });
@@ -198,7 +198,7 @@ describe("applyCartDelta — Extended", () => {
           quantity: 1,
         } as any,
       ];
-      const result = applyCartDelta(malformedActions);
+      const result = applyCartDelta(malformedActions, useCartStore.getState());
       expect(result.failed).toBe(1);
     });
 
@@ -210,7 +210,7 @@ describe("applyCartDelta — Extended", () => {
           quantity: 1,
         },
       ];
-      expect(() => applyCartDelta(actions)).not.toThrow();
+      expect(() => applyCartDelta(actions, useCartStore.getState())).not.toThrow();
       expect(useCartStore.getState().items).toHaveLength(0);
     });
 
@@ -222,7 +222,7 @@ describe("applyCartDelta — Extended", () => {
           quantity: 1,
         },
       ];
-      expect(() => applyCartDelta(actions)).not.toThrow();
+      expect(() => applyCartDelta(actions, useCartStore.getState())).not.toThrow();
       expect(useCartStore.getState().items).toHaveLength(0);
     });
 
@@ -232,7 +232,7 @@ describe("applyCartDelta — Extended", () => {
         itemId: "fake-item",
         quantity: 1,
       });
-      expect(() => applyCartDelta(actions)).not.toThrow();
+      expect(() => applyCartDelta(actions, useCartStore.getState())).not.toThrow();
       expect(useCartStore.getState().items).toHaveLength(0);
     });
   });
@@ -242,17 +242,17 @@ describe("applyCartDelta — Extended", () => {
   describe("Rapid sequential mutations", () => {
     it("final state should be deterministic after rapid add/remove cycles", () => {
       for (let i = 0; i < 10; i++) {
-        applyCartDelta([makeAddAction("burrata-salad", 1)]);
-        applyCartDelta([makeRemoveAction("burrata-salad")]);
+        applyCartDelta([makeAddAction("burrata-salad", 1)], useCartStore.getState());
+        applyCartDelta([makeRemoveAction("burrata-salad")], useCartStore.getState());
       }
       expect(useCartStore.getState().items).toHaveLength(0);
       assertCartConsistency();
     });
 
     it("rapid quantity updates should converge to final value", () => {
-      applyCartDelta([makeAddAction("tagliatelle", 1)]);
+      applyCartDelta([makeAddAction("tagliatelle", 1)], useCartStore.getState());
       for (let i = 1; i <= 20; i++) {
-        applyCartDelta([makeUpdateAction("tagliatelle", i)]);
+        applyCartDelta([makeUpdateAction("tagliatelle", i)], useCartStore.getState());
       }
       expect(useCartStore.getState().totalItems).toBe(20);
       assertCartConsistency();
@@ -268,7 +268,7 @@ describe("applyCartDelta — Extended", () => {
       //           update tagliatelle→1, remove yuzu, add cold-brew(2)
 
       for (const action of sequence) {
-        applyCartDelta([action]);
+        applyCartDelta([action], useCartStore.getState());
       }
 
       const state = useCartStore.getState();
@@ -287,20 +287,20 @@ describe("applyCartDelta — Extended", () => {
 
   describe("applyCartDeltaSafe — additional coverage", () => {
     it("should handle Symbol input without throwing", () => {
-      expect(() => applyCartDeltaSafe(Symbol("test") as any)).not.toThrow();
+      expect(() => applyCartDeltaSafe(Symbol("test") as any, useCartStore.getState())).not.toThrow();
     });
 
     it("should handle circular reference without crashing", () => {
       // Can't JSON.stringify circular refs, but applyCartDeltaSafe should survive
       const obj: any = {};
       obj.self = obj;
-      expect(() => applyCartDeltaSafe(obj)).not.toThrow();
+      expect(() => applyCartDeltaSafe(obj, useCartStore.getState())).not.toThrow();
     });
 
     it("should work with deeply nested array of arrays", () => {
       // [[{type:"ADD_ITEM"}]] is an array, so applyCartDeltaSafe processes it
       // The inner arrays are non-object CartActions so they fail
-      const result = applyCartDeltaSafe([[{ type: "ADD_ITEM" }]] as any);
+      const result = applyCartDeltaSafe([[{ type: "ADD_ITEM" }]] as any, useCartStore.getState());
       // Inner array wrapping produces a failed action, not zero
       expect(result.applied).toBe(0);
       expect(typeof result.failed).toBe("number");

@@ -19,7 +19,12 @@
 
 import { menuData } from "@/constants/menuData";
 import type { CartAction } from "@/lib/types";
-import { useCartStore } from "@/store/cartStore";
+
+export interface CartStoreMethods {
+  addItem: (item: { id: string; name: string; price: number; quantity: number; description: string; imageUrl: string }) => void;
+  removeItem: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
+}
 
 /**
  * Validates that a menu item exists and is available for purchase.
@@ -41,7 +46,7 @@ function validateMenuItem(itemId: string): boolean {
  * - Quantity bounds checking
  * - Silent failure (returns false) for invalid actions
  */
-function applySingleAction(action: CartAction): boolean {
+function applySingleAction(action: CartAction, store: CartStoreMethods): boolean {
   switch (action.type) {
     case "ADD_ITEM": {
       // Validate item exists in menu
@@ -72,7 +77,7 @@ function applySingleAction(action: CartAction): boolean {
       }
 
       // Add to cart via store
-      useCartStore.getState().addItem({
+      store.addItem({
         id: menuItem.id,
         name: menuItem.name,
         price: menuItem.price,
@@ -94,7 +99,7 @@ function applySingleAction(action: CartAction): boolean {
       }
 
       // Remove from cart via store
-      useCartStore.getState().removeItem(action.itemId);
+      store.removeItem(action.itemId);
       return true;
     }
 
@@ -120,7 +125,7 @@ function applySingleAction(action: CartAction): boolean {
       }
 
       // Update quantity in store (0 quantity removes the item)
-      useCartStore.getState().updateQuantity(action.itemId, action.quantity);
+      store.updateQuantity(action.itemId, action.quantity);
       return true;
     }
 
@@ -156,7 +161,7 @@ function applySingleAction(action: CartAction): boolean {
  * applyCartDelta(response.actions);
  * ```
  */
-export function applyCartDelta(actions: CartAction[]): {
+export function applyCartDelta(actions: CartAction[], store: CartStoreMethods): {
   applied: number;
   failed: number;
   skipped: number;
@@ -180,7 +185,7 @@ export function applyCartDelta(actions: CartAction[]): {
 
     // Attempt to apply the action
     try {
-      const success = applySingleAction(action as CartAction);
+      const success = applySingleAction(action as CartAction, store);
       if (success) {
         applied++;
       } else {
@@ -213,7 +218,7 @@ export function applyCartDelta(actions: CartAction[]): {
  *
  * Use this when you're not 100% sure about the response shape.
  */
-export function applyCartDeltaSafe(actions: unknown): {
+export function applyCartDeltaSafe(actions: unknown, store: CartStoreMethods): {
   applied: number;
   failed: number;
   skipped: number;
@@ -224,7 +229,7 @@ export function applyCartDeltaSafe(actions: unknown): {
       return { applied: 0, failed: 0, skipped: 0 };
     }
 
-    return applyCartDelta(actions);
+    return applyCartDelta(actions, store);
   } catch (error) {
     console.error("[Cart Delta Safe] Unexpected error:", error);
     return { applied: 0, failed: 0, skipped: 0 };

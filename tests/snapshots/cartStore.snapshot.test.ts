@@ -15,7 +15,6 @@ import { applyCartDelta } from "@/lib/applyCartDelta";
 import {
   parseCartActions,
   parseAIResponse,
-  parseExecutionLog,
 } from "@/lib/defensiveParsing";
 
 describe("Snapshot Tests", () => {
@@ -36,7 +35,7 @@ describe("Snapshot Tests", () => {
     });
 
     it("should snapshot single-item cart", () => {
-      applyCartDelta([makeAddAction("burrata-salad", 2)]);
+      applyCartDelta([makeAddAction("burrata-salad", 2)], useCartStore.getState());
 
       const { items, totalItems, totalPrice } = useCartStore.getState();
       const snapshot = {
@@ -58,7 +57,7 @@ describe("Snapshot Tests", () => {
         makeAddAction("burrata-salad", 1),
         makeAddAction("tagliatelle", 2),
         makeAddAction("yuzu-spritz", 3),
-      ]);
+      ], useCartStore.getState());
 
       const { items, totalItems, totalPrice } = useCartStore.getState();
       const snapshot = {
@@ -108,7 +107,7 @@ describe("Snapshot Tests", () => {
 
   describe("applyCartDelta return shape", () => {
     it("should snapshot return value for successful apply", () => {
-      const result = applyCartDelta([makeAddAction("burrata-salad", 1)]);
+      const result = applyCartDelta([makeAddAction("burrata-salad", 1)], useCartStore.getState());
       expect(result).toMatchSnapshot();
     });
 
@@ -116,7 +115,7 @@ describe("Snapshot Tests", () => {
       const result = applyCartDelta([
         { type: "ADD_ITEM", itemId: "fake-item", quantity: 1 },
         { type: "ADD_ITEM", itemId: "another-fake", quantity: 1 },
-      ]);
+      ], useCartStore.getState());
       expect(result).toMatchSnapshot();
     });
 
@@ -125,7 +124,7 @@ describe("Snapshot Tests", () => {
         { type: "ADD_ITEM", itemId: "burrata-salad", quantity: 1 },
         { type: "ADD_ITEM", itemId: "fake-item", quantity: 1 },
         null as any,
-      ]);
+      ], useCartStore.getState());
       expect(result).toMatchSnapshot();
     });
   });
@@ -156,19 +155,6 @@ describe("Snapshot Tests", () => {
       expect(result).toMatchSnapshot();
     });
 
-    it("should snapshot parseExecutionLog defaults for empty input", () => {
-      const result = parseExecutionLog([]);
-      expect(result).toMatchSnapshot();
-    });
 
-    it("should snapshot parseExecutionLog for valid 4-entry log", () => {
-      const result = parseExecutionLog([
-        "PROCESSING_INTENT...",
-        "VALIDATING_MENU...",
-        "UPDATING_STATE...",
-        "SYNC_COMPLETE",
-      ]);
-      expect(result).toMatchSnapshot();
-    });
   });
 });

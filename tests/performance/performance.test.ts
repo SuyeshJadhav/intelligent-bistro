@@ -52,7 +52,7 @@ describe("Performance Tests", () => {
   describe("applyCartDelta throughput", () => {
     it("should apply a single ADD_ITEM action within 16ms frame budget", () => {
       const start = performance.now();
-      applyCartDelta([makeAddAction("burrata-salad", 1)]);
+      applyCartDelta([makeAddAction("burrata-salad", 1)], useCartStore.getState());
       const elapsed = performance.now() - start;
 
       softAssertTiming("single ADD_ITEM", elapsed, FRAME_BUDGET_MS);
@@ -74,7 +74,7 @@ describe("Performance Tests", () => {
       ];
 
       const start = performance.now();
-      applyCartDelta(actions);
+      applyCartDelta(actions, useCartStore.getState());
       const elapsed = performance.now() - start;
 
       softAssertTiming("10-action delta", elapsed, 50);
@@ -87,11 +87,11 @@ describe("Performance Tests", () => {
     it("should process 100 successive single-action deltas within 500ms total", () => {
       const start = performance.now();
       for (let i = 0; i < 100; i++) {
-        applyCartDelta([makeUpdateAction("burrata-salad", i + 1)]);
+        applyCartDelta([makeUpdateAction("burrata-salad", i + 1)], useCartStore.getState());
         // Need item to exist first — add it once
         if (i === 0) {
           resetAllStores();
-          applyCartDelta([makeAddAction("burrata-salad", 1)]);
+          applyCartDelta([makeAddAction("burrata-salad", 1)], useCartStore.getState());
         }
       }
       const elapsed = performance.now() - start;
@@ -103,7 +103,7 @@ describe("Performance Tests", () => {
       const actions = Array(500).fill(makeAddAction("fake-item-not-on-menu", 1));
 
       const start = performance.now();
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
       const elapsed = performance.now() - start;
 
       softAssertTiming("500 invalid actions", elapsed, 500);
@@ -206,7 +206,7 @@ describe("Performance Tests", () => {
       let expectedTotal = 0;
       for (let i = 0; i < MENU.length; i++) {
         const qty = i + 1;
-        applyCartDelta([makeAddAction(MENU[i]!.id, qty)]);
+        applyCartDelta([makeAddAction(MENU[i]!.id, qty)], useCartStore.getState());
         expectedTotal += MENU[i]!.price * qty;
       }
 

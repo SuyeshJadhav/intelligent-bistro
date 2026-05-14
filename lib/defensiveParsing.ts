@@ -263,69 +263,7 @@ export function validateCartAction(
   }
 }
 
-/**
- * Safe execution log parser
- * Always returns array of 4 strings, padding with defaults if needed
- */
-export function parseExecutionLog(
-  data: unknown,
-  logger?: Console,
-): [string, string, string, string] {
-  const log = logger || console;
 
-  const defaults: [string, string, string, string] = [
-    "PROCESSING_INTENT...",
-    "VALIDATING_MENU...",
-    "UPDATING_STATE...",
-    "SYNC_COMPLETE",
-  ];
-
-  if (!Array.isArray(data)) {
-    log.debug("[Defensive] executionLog is not an array");
-    return defaults;
-  }
-
-  if (data.length !== 4) {
-    log.debug(
-      `[Defensive] executionLog has ${data.length} entries, expected 4`,
-    );
-  }
-
-  const result: [string, string, string, string] = [...defaults];
-
-  for (let i = 0; i < Math.min(data.length, 4); i++) {
-    if (typeof data[i] === "string") {
-      result[i] = data[i];
-    } else {
-      log.debug(`[Defensive] executionLog[${i}] is not a string:`, data[i]);
-    }
-  }
-
-  return result;
-}
-
-/**
- * Defensive wrapper for JSON parsing
- * Returns parsed object or null if parsing fails
- */
-export function safeJsonParse(jsonString: unknown, logger?: Console): unknown {
-  const log = logger || console;
-
-  if (typeof jsonString !== "string") {
-    log.debug("[Defensive] Input to safeJsonParse is not a string");
-    return null;
-  }
-
-  try {
-    return JSON.parse(jsonString);
-  } catch (error) {
-    log.debug(
-      "[Defensive] JSON parse error:",
-      error instanceof Error ? error.message : String(error),
-    );
-    return null;
-  }
-}
 
 /**
  * Defensive wrapper for creating a cart action

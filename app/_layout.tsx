@@ -53,13 +53,11 @@ export default function RootLayout() {
         <CartProvider>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
+          <AIAssistantSheet />
         </CartProvider>
         <StatusBar style="auto" />
       </SafeAreaProvider>
-      <AIAssistantSheet />
     </GestureHandlerRootView>
   );
 }

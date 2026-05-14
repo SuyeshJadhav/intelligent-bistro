@@ -79,7 +79,7 @@ describe("Full Order Flow — Integration", () => {
       const parsed = parseAIResponse(apiResponse);
       expect(parsed).not.toBeNull();
 
-      const { applied } = applyCartDelta(parsed!.actions);
+      const { applied } = applyCartDelta(parsed!.actions, useCartStore.getState());
       expect(applied).toBe(1);
 
       const state = useCartStore.getState();
@@ -97,7 +97,7 @@ describe("Full Order Flow — Integration", () => {
 
       const apiResponse = await sendChatMessage("Order a full meal", EMPTY_CART_API);
       const parsed = parseAIResponse(apiResponse);
-      const { applied } = applyCartDelta(parsed!.actions);
+      const { applied } = applyCartDelta(parsed!.actions, useCartStore.getState());
 
       expect(applied).toBe(3);
       const state = useCartStore.getState();
@@ -114,14 +114,14 @@ describe("Full Order Flow — Integration", () => {
       // Seed cart: add burrata-salad x2
       setupSuccessResponse(makeAddItemResponse("burrata-salad", 2));
       const resp = await sendChatMessage("Add 2 burrata", EMPTY_CART_API);
-      applyCartDelta(parseAIResponse(resp)!.actions);
+      applyCartDelta(parseAIResponse(resp)!.actions, useCartStore.getState());
     });
 
     it("should correctly update quantity via UPDATE_QUANTITY", async () => {
       setupSuccessResponse(makeUpdateQuantityResponse("burrata-salad", 5));
 
       const resp = await sendChatMessage("Make it 5 burratas", EMPTY_CART_API);
-      applyCartDelta(parseAIResponse(resp)!.actions);
+      applyCartDelta(parseAIResponse(resp)!.actions, useCartStore.getState());
 
       expect(useCartStore.getState().totalItems).toBe(5);
       assertCartConsistency();
@@ -131,7 +131,7 @@ describe("Full Order Flow — Integration", () => {
       setupSuccessResponse(makeRemoveItemResponse("burrata-salad"));
 
       const resp = await sendChatMessage("Remove burrata", EMPTY_CART_API);
-      applyCartDelta(parseAIResponse(resp)!.actions);
+      applyCartDelta(parseAIResponse(resp)!.actions, useCartStore.getState());
 
       expect(useCartStore.getState().items).toHaveLength(0);
       assertCartConsistency();
@@ -146,7 +146,7 @@ describe("Full Order Flow — Integration", () => {
 
       const resp = await sendChatMessage("Add pizza and cheesecake", EMPTY_CART_API);
       const parsed = parseAIResponse(resp)!;
-      const { applied, failed } = applyCartDelta(parsed.actions);
+      const { applied, failed } = applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(applied).toBe(0);
       expect(failed).toBe(2);
@@ -162,7 +162,7 @@ describe("Full Order Flow — Integration", () => {
 
       const resp = await sendChatMessage("Add burrata twice", EMPTY_CART_API);
       const parsed = parseAIResponse(resp)!;
-      applyCartDelta(parsed.actions);
+      applyCartDelta(parsed.actions, useCartStore.getState());
 
       const state = useCartStore.getState();
       expect(state.items).toHaveLength(1);
@@ -179,7 +179,7 @@ describe("Full Order Flow — Integration", () => {
 
       const resp = await sendChatMessage("Add then remove", EMPTY_CART_API);
       const parsed = parseAIResponse(resp)!;
-      applyCartDelta(parsed.actions);
+      applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(useCartStore.getState().items).toHaveLength(0);
     });
@@ -219,7 +219,7 @@ describe("Full Order Flow — Integration", () => {
 
       // Can't use fake timers here (MSW needs real timers), so use real time
       const resp = await manager.sendWithRetry("Add tagliatelle", EMPTY_CART_API);
-      applyCartDelta(parseAIResponse(resp)!.actions);
+      applyCartDelta(parseAIResponse(resp)!.actions, useCartStore.getState());
 
       expect(useCartStore.getState().totalItems).toBe(1);
       assertCartConsistency();
@@ -250,7 +250,7 @@ describe("Full Order Flow — Integration", () => {
       for (const step of steps) {
         setupSuccessResponse(step.response);
         const resp = await sendChatMessage("order step", EMPTY_CART_API);
-        applyCartDelta(parseAIResponse(resp)!.actions);
+        applyCartDelta(parseAIResponse(resp)!.actions, useCartStore.getState());
         assertCartConsistency();
         expect(useCartStore.getState().totalItems).toBe(step.expectedItems);
         mockServer.resetHandlers();

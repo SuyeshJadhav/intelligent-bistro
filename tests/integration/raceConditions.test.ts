@@ -76,7 +76,7 @@ describe("Race Condition Tests", () => {
 
       // Only the first succeeds; second is debounced
       const req1 = manager.sendWithRetry("Add burrata", [] as any[]).then((resp) => {
-        applyCartDelta(resp.actions);
+        applyCartDelta(resp.actions, useCartStore.getState());
       });
 
       try {
@@ -101,10 +101,10 @@ describe("Race Condition Tests", () => {
   describe("Simultaneous cart mutations", () => {
     it("should produce deterministic final state after sequential same-item mutations", () => {
       // Simulates rapid UI-driven mutations (e.g., quantity stepper spam)
-      applyCartDelta([makeAddAction("salmon-bowl", 1)]);
+      applyCartDelta([makeAddAction("salmon-bowl", 1)], useCartStore.getState());
 
       for (let q = 1; q <= 10; q++) {
-        applyCartDelta([makeUpdateAction("salmon-bowl", q)]);
+        applyCartDelta([makeUpdateAction("salmon-bowl", q)], useCartStore.getState());
       }
 
       // Final state: quantity should be 10 (last write wins)
@@ -115,8 +115,8 @@ describe("Race Condition Tests", () => {
     it("should not produce negative totals under conflicting add/remove", () => {
       // Simulate race: add and remove of same item in tight sequence
       for (let i = 0; i < 5; i++) {
-        applyCartDelta([makeAddAction("tagliatelle", 1)]);
-        applyCartDelta([makeRemoveAction("tagliatelle")]);
+        applyCartDelta([makeAddAction("tagliatelle", 1)], useCartStore.getState());
+        applyCartDelta([makeRemoveAction("tagliatelle")], useCartStore.getState());
       }
 
       // Cart should always be >= 0
@@ -136,7 +136,7 @@ describe("Race Condition Tests", () => {
 
       // Add all items in rapid succession
       for (const id of items) {
-        applyCartDelta([makeAddAction(id, 1)]);
+        applyCartDelta([makeAddAction(id, 1)], useCartStore.getState());
       }
 
       expect(useCartStore.getState().items).toHaveLength(5);
@@ -156,7 +156,7 @@ describe("Race Condition Tests", () => {
 
       const response = await responsePromise;
       // Only apply if we choose to — here we apply to test the raw behavior
-      applyCartDelta(response.actions);
+      applyCartDelta(response.actions, useCartStore.getState());
 
       // Cart has items from the stale response; this is expected behavior
       // The real app would check if the request is still relevant
@@ -184,7 +184,7 @@ describe("Race Condition Tests", () => {
       await new Promise((r) => setTimeout(r, 400)); // past 300ms debounce
 
       const resp = await manager.sendWithRetry("Order cold brew", [] as any[]);
-      applyCartDelta(resp.actions);
+      applyCartDelta(resp.actions, useCartStore.getState());
 
       expect(useCartStore.getState().totalItems).toBe(1);
     });
@@ -201,7 +201,7 @@ describe("Race Condition Tests", () => {
       const manager = new RequestManager();
       manager.setRetryConfig({ maxAttempts: 3, initialDelayMs: 500 });
 
-      const promise = manager.sendWithRetry("Order something", [] as any[]);
+      const promise = manager.sendWithRetry("Order something", [] as any[]).catch(() => {});
       // Cancel before retries complete
       manager.cancelRequest();
 
@@ -248,7 +248,7 @@ describe("Race Condition Tests", () => {
       const respPromise = manager.sendWithRetry("Add risotto", [] as any[]);
       await vi.runAllTimersAsync();
       const resp = await respPromise;
-      applyCartDelta(resp.actions);
+      applyCartDelta(resp.actions, useCartStore.getState());
 
       vi.useRealTimers();
 

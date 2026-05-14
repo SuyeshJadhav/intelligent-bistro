@@ -9,6 +9,7 @@ module.exports = {
 				surface: '#FFFFFF',
 				'surface-container': '#F1EDEC',
 				'surface-elevated': '#FCFCFA',
+				'surface-secondary': '#F0F0EC',
 				'primary-text': '#111111',
 				'secondary-text': '#666666',
 				'muted-text': '#9B9B9B',

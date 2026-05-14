@@ -11,6 +11,7 @@
  */
 
 import type { AIResponse, APIError, ChatRequest } from "./types";
+import { parseAIResponse } from "./defensiveParsing";
 
 // Configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
@@ -36,39 +37,7 @@ export class APIClientError extends Error {
   }
 }
 
-/**
- * Validates that the response has the expected AIResponse shape.
- */
-function isValidAIResponse(data: unknown): data is AIResponse {
-  if (!data || typeof data !== "object") return false;
 
-  const obj = data as Record<string, unknown>;
-
-  // Check required fields
-  if (!Array.isArray(obj.actions)) return false;
-  if (typeof obj.confirmation !== "string") return false;
-  if (!Array.isArray(obj.executionLog)) return false;
-
-  // Validate execution log has exactly 4 entries
-  if (obj.executionLog.length !== 4) return false;
-  if (!obj.executionLog.every((entry) => typeof entry === "string"))
-    return false;
-
-  // Validate each action has the correct shape
-  for (const action of obj.actions) {
-    if (!action || typeof action !== "object") return false;
-    const act = action as Record<string, unknown>;
-
-    if (typeof act.type !== "string") return false;
-    if (typeof act.itemId !== "string") return false;
-
-    // quantity is optional for REMOVE_ITEM, but if present must be a number
-    if (act.quantity !== undefined && typeof act.quantity !== "number")
-      return false;
-  }
-
-  return true;
-}
 
 /**
  * Creates an AbortSignal that times out after the specified duration.
@@ -154,8 +123,9 @@ export async function sendChatMessage(
       );
     }
 
-    // Validate response shape
-    if (!isValidAIResponse(data)) {
+    // Validate response shape using defensive parser
+    const parsedResponse = parseAIResponse(data);
+    if (!parsedResponse) {
       throw new APIClientError(
         "INVALID_RESPONSE",
         response.status,
@@ -163,7 +133,7 @@ export async function sendChatMessage(
       );
     }
 
-    return data;
+    return parsedResponse;
   } catch (error) {
     // Re-throw our custom errors
     if (error instanceof APIClientError) {
@@ -213,4 +183,16 @@ export async function healthCheck(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Strips down full CartItem objects to the minimal payload required by the backend.
+ */
+export function toCartPayload(cartState: any[]): ChatRequest["cart"] {
+  return cartState.map((item) => ({
+    id: item.id,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  }));
 }

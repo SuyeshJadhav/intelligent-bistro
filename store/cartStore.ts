@@ -9,14 +9,6 @@ export interface CartItem {
   imageUrl: string;
 }
 
-export interface CartAction {
-  type: "ADD_ITEM" | "REMOVE_ITEM" | "UPDATE_QUANTITY";
-  itemId: string;
-  quantity: number;
-  name: string;
-  price: number;
-}
-
 type CartInput = Omit<CartItem, "quantity"> & {
   quantity?: number;
 };

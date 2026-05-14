@@ -63,7 +63,7 @@ describe("Security Tests", () => {
         const actions: CartAction[] = [
           { type: "ADD_ITEM", itemId: payload, quantity: 1 },
         ];
-        const result = applyCartDelta(actions);
+        const result = applyCartDelta(actions, useCartStore.getState());
         // Must fail because payload is not a valid menu item ID
         expect(result.applied).toBe(0);
         expect(useCartStore.getState().items).toHaveLength(0);
@@ -73,7 +73,7 @@ describe("Security Tests", () => {
     it("should not throw for any injection payload", () => {
       for (const payload of injectionPayloads) {
         expect(() =>
-          applyCartDelta([{ type: "ADD_ITEM", itemId: payload, quantity: 1 }]),
+          applyCartDelta([{ type: "ADD_ITEM", itemId: payload, quantity: 1 }], useCartStore.getState()),
         ).not.toThrow();
       }
     });
@@ -101,7 +101,7 @@ describe("Security Tests", () => {
         itemId: "fake-item",
         quantity: 1,
       });
-      expect(() => applyCartDelta(actions)).not.toThrow();
+      expect(() => applyCartDelta(actions, useCartStore.getState())).not.toThrow();
       expect(useCartStore.getState().items).toHaveLength(0);
     });
 
@@ -112,7 +112,7 @@ describe("Security Tests", () => {
         itemId: "burrata-salad",
         quantity: 1,
       });
-      expect(() => applyCartDelta(actions)).not.toThrow();
+      expect(() => applyCartDelta(actions, useCartStore.getState())).not.toThrow();
       const state = useCartStore.getState();
       expect(state.items).toHaveLength(1); // all accumulated into same item
       expect(state.totalItems).toBe(1000);
@@ -248,8 +248,8 @@ describe("Security Tests", () => {
       ];
 
       for (const input of inputs) {
-        expect(() => applyCartDeltaSafe(input as any)).not.toThrow();
-        const result = applyCartDeltaSafe(input as any);
+        expect(() => applyCartDeltaSafe(input as any, useCartStore.getState())).not.toThrow();
+        const result = applyCartDeltaSafe(input as any, useCartStore.getState());
         expect(result).toEqual({ applied: 0, failed: 0, skipped: 0 });
       }
     });

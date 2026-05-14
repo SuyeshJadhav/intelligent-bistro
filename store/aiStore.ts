@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { CartAction } from "@/store/cartStore";
+import type { CartAction } from "@/lib/types";
 
 export interface Message {
   role: "user" | "ai";
@@ -13,6 +13,7 @@ interface AIState {
   isProcessing: boolean;
   messages: Message[];
   executionLog: string[];
+  lastError: string | null;
   openAI: () => void;
   closeAI: () => void;
   sendMessage: (content: string, actions?: CartAction[]) => void;
@@ -20,6 +21,7 @@ interface AIState {
   setProcessing: (isProcessing: boolean) => void;
   appendLog: (entry: string) => void;
   clearLog: () => void;
+  setLastError: (error: string | null) => void;
 }
 
 export const useAIStore = create<AIState>((set) => ({
@@ -27,6 +29,7 @@ export const useAIStore = create<AIState>((set) => ({
   isProcessing: false,
   messages: [],
   executionLog: [],
+  lastError: null,
   openAI: () => set({ isOpen: true }),
   closeAI: () => set({ isOpen: false }),
   sendMessage: (content, actions) =>
@@ -53,4 +56,5 @@ export const useAIStore = create<AIState>((set) => ({
     set({
       executionLog: [],
     }),
+  setLastError: (error) => set({ lastError: error }),
 }));

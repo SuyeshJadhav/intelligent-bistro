@@ -1,7 +1,7 @@
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { BottomSheetMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
 import React, { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View, Alert } from 'react-native';
 import { THEME } from '../../constants/theme';
 import { useCartStore } from '../../store/cartStore';
 import CartItem from './CartItem';
@@ -27,7 +27,19 @@ const CartSheet = forwardRef<CartSheetRef, object>((_props, ref) => {
 	const snapPoints = ['50%', '95%'];
 
 	const onConfirm = useCallback(() => {
-		console.log('Confirm Order');
+		Alert.alert(
+			'Order placed!',
+			'Your food is on its way.',
+			[
+				{
+					text: 'OK',
+					onPress: () => {
+						useCartStore.getState().clearCart();
+						bottomSheetRef.current?.close();
+					},
+				},
+			]
+		);
 	}, []);
 
 	const handleUpdateQuantity = (id: string, qty: number) => updateQuantity(id, qty);

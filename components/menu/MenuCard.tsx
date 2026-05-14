@@ -10,10 +10,22 @@ type MenuCardProps = {
 
 export function MenuCard({ item }: MenuCardProps) {
 	const addItem = useCartStore((state) => state.addItem);
+	const updateQuantity = useCartStore((state) => state.updateQuantity);
+	const quantity = useCartStore(
+		(state) => state.items.find((i) => i.id === item.id)?.quantity ?? 0
+	);
 
 	const handleAdd = () => {
 		const { category, ...cartItem } = item;
 		addItem({ ...cartItem, quantity: 1 });
+	};
+
+	const handleIncrement = () => {
+		updateQuantity(item.id, quantity + 1);
+	};
+
+	const handleDecrement = () => {
+		updateQuantity(item.id, quantity - 1);
 	};
 
 	return (
@@ -31,11 +43,29 @@ export function MenuCard({ item }: MenuCardProps) {
 				<View className="mt-4 flex-row items-center justify-between">
 					<Text className="font-mono text-base text-primary-text">${item.price.toFixed(2)}</Text>
 
-					<Pressable
-						onPress={handleAdd}
-						className="h-9 w-9 items-center justify-center rounded-full bg-primary-text">
-						<Text className="text-lg leading-none text-white">+</Text>
-					</Pressable>
+					{quantity > 0 ? (
+						<View className="flex-row items-center space-x-3">
+							<Pressable
+								onPress={handleDecrement}
+								className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
+								<Text className="text-xl leading-none text-primary-text">−</Text>
+							</Pressable>
+							<Text className="font-sans text-base font-semibold text-primary-text">
+								{quantity}
+							</Text>
+							<Pressable
+								onPress={handleIncrement}
+								className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
+								<Text className="text-xl leading-none text-primary-text">+</Text>
+							</Pressable>
+						</View>
+					) : (
+						<Pressable
+							onPress={handleAdd}
+							className="h-9 w-9 items-center justify-center rounded-full bg-primary-text">
+							<Text className="text-lg leading-none text-white">+</Text>
+						</Pressable>
+					)}
 				</View>
 			</View>
 		</View>

@@ -20,9 +20,6 @@
 import { BlurView } from "expo-blur";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-	Dimensions,
-	KeyboardAvoidingView,
-	Platform,
 	Pressable,
 	Text,
 	View,
@@ -36,11 +33,9 @@ import Animated, {
 	withTiming,
 } from "react-native-reanimated";
 
-import { applyCartDeltaSafe } from "@/lib/applyCartDelta";
-import { parseAIResponse } from "@/lib/defensiveParsing";
 import { requestManager } from "@/lib/requestManager";
 import { useAIStore } from "@/store/aiStore";
-import { useCartStore } from "@/store/cartStore";
+import { useAIOrchestrator } from "@/hooks/useAIOrchestrator";
 
 import { AIInput } from "./AIInput";
 import { AIMessage } from "./AIMessage";
@@ -57,33 +52,15 @@ import { ExecutionLog } from "./ExecutionLog";
  * - Smooth animations
  */
 export function AIAssistantSheet() {
-	const screenHeight = Dimensions.get("window").height;
-
 	// AI Store
 	const isOpen = useAIStore((state) => state.isOpen);
 	const isProcessing = useAIStore((state) => state.isProcessing);
 	const messages = useAIStore((state) => state.messages);
 	const executionLog = useAIStore((state) => state.executionLog);
 	const closeAI = useAIStore((state) => state.closeAI);
-	const setProcessing = useAIStore((state) => state.setProcessing);
-	const appendLog = useAIStore((state) => state.appendLog);
-	const clearLog = useAIStore((state) => state.clearLog);
-
-	// Store actions to add AI response messages
-	const addAIMessage = useAIStore((state) => {
-		if (!state.sendMessage) {
-			// Initialize if not present
-			return () => { };
-		}
-		return state.sendMessage;
-	});
-
-	// Cart Store
-	const cartItems = useCartStore((state) => state.items);
+	const lastError = useAIStore((state) => state.lastError);
 
 	// Local state
-	const [input, setInput] = useState("");
-	const [lastError, setLastError] = useState<string | null>(null);
 	const scrollViewRef = useRef<any>(null);
 	const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -141,159 +118,13 @@ export function AIAssistantSheet() {
 	);
 
 
-	/**
-	 * Main send handler - orchestrates the entire flow with production-grade reliability.
-	 *
-	 * Features:
-	 * - Debounces rapid requests
-	 * - Automatically retries on network errors
-	 * - Cancels previous in-flight request
-	 * - Defensive parsing of backend response
-	 * - Graceful error handling
-	 */
-	const handleSend = useCallback(async () => {
-		const prompt = input.trim();
 
-		if (!prompt || isProcessing) {
-			return;
-		}
-
-		try {
-			// Clear previous errors and log
-			setLastError(null);
-			clearLog();
-
-			// 1. Show optimistic user message
-			const userMessage = { role: "user" as const, content: prompt };
-			useAIStore.setState((state) => ({
-				messages: [...state.messages, userMessage],
-			}));
-
-			// Clear input immediately for better UX
-			setInput("");
-
-			// 2. Start processing
-			setProcessing(true);
-			appendLog("PROCESSING_INTENT...");
-
-			// 3. Send to backend API via RequestManager (handles retry, debounce)
-			appendLog("VALIDATING_MENU...");
-
-			const cartPayload = cartItems.map((item) => ({
-				id: item.id,
-				name: item.name,
-				price: item.price,
-				quantity: item.quantity,
-			}));
-
-			// Use RequestManager for production-grade reliability
-			const response = await requestManager.sendWithRetry(
-				prompt,
-				cartPayload,
-				(attempt, error) => {
-					console.log(`[AIAssistant] Retry attempt ${attempt}: ${error.message}`);
-					appendLog(`RETRYING... (${attempt})`);
-				}
-			);
-
-			// 4. Defensively parse response
-			const parsedResponse = parseAIResponse(response);
-			if (!parsedResponse) {
-				throw new Error("Backend response failed validation");
-			}
-
-			// 5. Show execution logs from backend
-			for (const logEntry of parsedResponse.executionLog) {
-				appendLog(logEntry);
-				// Small delay between log entries for staggered visual effect
-				await new Promise((resolve) => setTimeout(resolve, 150));
-			}
-
-			// 6. Apply cart mutations safely
-			appendLog("APPLYING_MUTATIONS...");
-			const { applied, failed } = applyCartDeltaSafe(parsedResponse.actions);
-
-			if (failed > 0) {
-				console.warn(`[AIAssistant] ${failed} cart actions failed to apply`);
-			}
-
-			// 7. Show AI response message
-			const aiMessage = {
-				role: "ai" as const,
-				content: parsedResponse.confirmation,
-			};
-
-			useAIStore.setState((state) => ({
-				messages: [...state.messages, aiMessage],
-			}));
-
-			// Mark completion
-			appendLog("COMPLETE");
-		} catch (error) {
-			let errorMessage = "Something went wrong. Please try again.";
-			let logEntry = "ERROR";
-
-			if (error instanceof Error) {
-				if (error.message.includes("offline") || error.message.includes("Offline")) {
-					errorMessage =
-						"You appear to be offline. Please check your connection.";
-					logEntry = "OFFLINE_ERROR";
-				} else if (error.message.includes("Too many requests")) {
-					errorMessage = "Please wait before sending another message.";
-					logEntry = "DEBOUNCE_ERROR";
-				} else if (error.message.includes("timed out")) {
-					errorMessage =
-						"Request timed out. Backend may be slow or unreachable.";
-					logEntry = "TIMEOUT_ERROR";
-				} else if (error.message.includes("validation")) {
-					errorMessage =
-						"Backend returned invalid data. Please check backend logs.";
-					logEntry = "VALIDATION_ERROR";
-				} else {
-					errorMessage = error.message;
-				}
-			}
-
-			appendLog(logEntry);
-			setLastError(errorMessage);
-
-			// Add error message to chat
-			const errorMessage_obj = {
-				role: "ai" as const,
-				content: `Error: ${errorMessage}`,
-			};
-
-			useAIStore.setState((state) => ({
-				messages: [...state.messages, errorMessage_obj],
-			}));
-
-			console.error("[AIAssistant] Request failed:", error);
-		} finally {
-			setProcessing(false);
-		}
-	}, [
-		input,
-		isProcessing,
-		clearLog,
-		setProcessing,
-		appendLog,
-		cartItems,
-	]);
 
 	const renderFooter = useCallback(
 		(props: any) => (
-			<BottomSheetFooter {...props} bottomInset={0}>
-				<Animated.View style={[innerStyle, { backgroundColor: "rgba(255, 255, 255, 0.85)" }]}>
-					<AIInput
-						value={input}
-						onChangeText={setInput}
-						onSend={handleSend}
-						isDisabled={isProcessing}
-					/>
-				</Animated.View>
-			</BottomSheetFooter>
+			<AIAssistantFooter {...props} innerStyle={innerStyle} />
 		),
-		[input, isProcessing, handleSend, innerStyle]
+		[innerStyle]
 	);
 
 	return (
@@ -376,5 +207,24 @@ export function AIAssistantSheet() {
 				</BottomSheetScrollView>
 			</View>
 		</BottomSheet>
+	);
+}
+
+function AIAssistantFooter(props: any) {
+	const [input, setInput] = useState("");
+	const { handleSend } = useAIOrchestrator(input, setInput);
+	const isProcessing = useAIStore((state) => state.isProcessing);
+
+	return (
+		<BottomSheetFooter {...props} bottomInset={0}>
+			<Animated.View style={[props.innerStyle, { backgroundColor: "rgba(255, 255, 255, 0.85)" }]}>
+				<AIInput
+					value={input}
+					onChangeText={setInput}
+					onSend={handleSend}
+					isDisabled={isProcessing}
+				/>
+			</Animated.View>
+		</BottomSheetFooter>
 	);
 }

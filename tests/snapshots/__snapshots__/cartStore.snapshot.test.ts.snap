@@ -121,21 +121,3 @@ exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parse
   },
 ]
 `;
-
-exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parseExecutionLog defaults for empty input 1`] = `
-[
-  "PROCESSING_INTENT...",
-  "VALIDATING_MENU...",
-  "UPDATING_STATE...",
-  "SYNC_COMPLETE",
-]
-`;
-
-exports[`Snapshot Tests > defensiveParsing output shapes > should snapshot parseExecutionLog for valid 4-entry log 1`] = `
-[
-  "PROCESSING_INTENT...",
-  "VALIDATING_MENU...",
-  "UPDATING_STATE...",
-  "SYNC_COMPLETE",
-]
-`;

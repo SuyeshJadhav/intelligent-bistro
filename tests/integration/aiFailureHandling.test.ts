@@ -52,7 +52,7 @@ describe("AI Failure Handling Tests", () => {
   describe("Hallucinated menu items", () => {
     it("'Add pizza' → should be rejected, cart remains empty", () => {
       const parsed = parseAIResponse(HALLUCINATED_ITEM_RESPONSE, mockLogger)!;
-      const { applied, failed } = applyCartDelta(parsed.actions);
+      const { applied, failed } = applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(applied).toBe(0);
       expect(failed).toBe(2);
@@ -64,7 +64,7 @@ describe("AI Failure Handling Tests", () => {
       const parsed = parseAIResponse(EXTREME_QUANTITY_RESPONSE, mockLogger)!;
       // 999 is valid quantity for ADD_ITEM, but "burrata-salad" is on menu (valid)
       // EXTREME_QUANTITY_RESPONSE uses burrata-salad, so it WILL be applied
-      const { applied } = applyCartDelta(parsed.actions);
+      const { applied } = applyCartDelta(parsed.actions, useCartStore.getState());
       expect(applied).toBe(1);
       expect(useCartStore.getState().totalItems).toBe(999);
       assertCartConsistency(); // totals still consistent
@@ -77,7 +77,7 @@ describe("AI Failure Handling Tests", () => {
         executionLog: ["PROCESSING_INTENT...", "VALIDATING_MENU...", "UPDATING_STATE...", "SYNC_COMPLETE"] as [string, string, string, string],
       };
       const parsed = parseAIResponse(offMenuResponse, mockLogger)!;
-      const { applied, failed } = applyCartDelta(parsed.actions);
+      const { applied, failed } = applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(applied).toBe(0);
       expect(failed).toBe(1);
@@ -90,7 +90,7 @@ describe("AI Failure Handling Tests", () => {
         executionLog: ["PROCESSING_INTENT...", "VALIDATING_MENU...", "UPDATING_STATE...", "SYNC_COMPLETE"] as [string, string, string, string],
       };
       const parsed = parseAIResponse(removeNonExistent, mockLogger)!;
-      const { applied } = applyCartDelta(parsed.actions);
+      const { applied } = applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(applied).toBe(1); // REMOVE_ITEM passes, but has no effect
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -154,7 +154,7 @@ describe("AI Failure Handling Tests", () => {
       // parseCartActions accepts any type string but applyCartDelta's switch rejects them
       // Note: parseCartActions validates type is a string but not the specific enum
       // The actions will pass parseCartActions but fail applySingleAction's default case
-      const result = applyCartDelta(actions as any);
+      const result = applyCartDelta(actions as any, useCartStore.getState());
       expect(result.failed).toBeGreaterThan(0);
       expect(useCartStore.getState().items).toHaveLength(0);
     });
@@ -165,7 +165,7 @@ describe("AI Failure Handling Tests", () => {
   describe("Duplicate actions", () => {
     it("Two identical ADD_ITEM actions → quantity accumulates (2x)", () => {
       const parsed = parseAIResponse(DUPLICATE_ACTIONS_RESPONSE, mockLogger)!;
-      applyCartDelta(parsed.actions);
+      applyCartDelta(parsed.actions, useCartStore.getState());
 
       const state = useCartStore.getState();
       expect(state.items).toHaveLength(1); // Not duplicated as separate items
@@ -174,9 +174,9 @@ describe("AI Failure Handling Tests", () => {
     });
 
     it("Same REMOVE_ITEM action twice → idempotent (no crash, no negative state)", () => {
-      applyCartDelta([makeAddAction("burrata-salad", 2)]);
-      applyCartDelta([{ type: "REMOVE_ITEM", itemId: "burrata-salad" }]);
-      applyCartDelta([{ type: "REMOVE_ITEM", itemId: "burrata-salad" }]); // second time
+      applyCartDelta([makeAddAction("burrata-salad", 2)], useCartStore.getState());
+      applyCartDelta([{ type: "REMOVE_ITEM", itemId: "burrata-salad" }], useCartStore.getState());
+      applyCartDelta([{ type: "REMOVE_ITEM", itemId: "burrata-salad" }], useCartStore.getState()); // second time
 
       expect(useCartStore.getState().items).toHaveLength(0);
       expect(useCartStore.getState().totalItems).toBe(0);
@@ -189,7 +189,7 @@ describe("AI Failure Handling Tests", () => {
   describe("Conflicting mutations", () => {
     it("ADD_ITEM then immediate REMOVE_ITEM in one delta → item is removed", () => {
       const parsed = parseAIResponse(CONFLICTING_ACTIONS_RESPONSE, mockLogger)!;
-      applyCartDelta(parsed.actions);
+      applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(useCartStore.getState().items).toHaveLength(0);
       assertCartConsistency();
@@ -199,7 +199,7 @@ describe("AI Failure Handling Tests", () => {
       applyCartDelta([
         makeAddAction("tagliatelle", 5),
         { type: "UPDATE_QUANTITY", itemId: "tagliatelle", quantity: 0 },
-      ]);
+      ], useCartStore.getState());
 
       expect(useCartStore.getState().items).toHaveLength(0);
       assertCartConsistency();
@@ -215,7 +215,7 @@ describe("AI Failure Handling Tests", () => {
         mockLogger,
       );
       if (parsed) {
-        const { failed } = applyCartDelta(parsed.actions);
+        const { failed } = applyCartDelta(parsed.actions, useCartStore.getState());
         expect(failed).toBe(1);
       } else {
         // If Zod/parseAIResponse rejects it, that's also correct
@@ -233,7 +233,7 @@ describe("AI Failure Handling Tests", () => {
       // So parsed.actions is [] — applyCartDelta receives an empty array → failed=0.
       if (parsed) {
         expect(parsed.actions).toHaveLength(0); // filtered at parseCartActions level
-        const { failed } = applyCartDelta(parsed.actions);
+        const { failed } = applyCartDelta(parsed.actions, useCartStore.getState());
         expect(failed).toBe(0); // nothing to fail — the invalid action was already removed
       }
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -276,7 +276,7 @@ describe("AI Failure Handling Tests", () => {
       };
 
       const parsed = parseAIResponse(ambiguousResponse, mockLogger)!;
-      const { applied } = applyCartDelta(parsed.actions);
+      const { applied } = applyCartDelta(parsed.actions, useCartStore.getState());
 
       expect(applied).toBe(0);
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -300,8 +300,8 @@ describe("AI Failure Handling Tests", () => {
 
     failureModes.forEach((input, index) => {
       it(`failure mode ${index + 1}: should not throw and return zero report`, () => {
-        expect(() => applyCartDeltaSafe(input as any)).not.toThrow();
-        const result = applyCartDeltaSafe(input as any);
+        expect(() => applyCartDeltaSafe(input as any, useCartStore.getState())).not.toThrow();
+        const result = applyCartDeltaSafe(input as any, useCartStore.getState());
         // Every failure mode produces { applied: 0, failed: 0, skipped: 0 }
         // because applyCartDeltaSafe catches the non-array case early
         expect(typeof result.applied).toBe("number");

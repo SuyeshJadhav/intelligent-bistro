@@ -165,18 +165,16 @@ describe("sendChatMessage", () => {
       );
     });
 
-    it("should throw INVALID_RESPONSE if actions is not an array", async () => {
+    it("should resolve with empty actions if actions is not an array (defensive parsing)", async () => {
       setupSuccessResponse({
         actions: "not-an-array" as any,
         confirmation: "done",
         executionLog: VALID_EXECUTION_LOG,
       });
 
-      await expect(sendChatMessage(TEST_MESSAGE, EMPTY_CART)).rejects.toMatchObject(
-        {
-          code: "INVALID_RESPONSE",
-        },
-      );
+      const response = await sendChatMessage(TEST_MESSAGE, EMPTY_CART);
+      expect(response.actions).toEqual([]);
+      expect(response.confirmation).toBe("done");
     });
 
     it("should throw INVALID_RESPONSE if confirmation is missing", async () => {

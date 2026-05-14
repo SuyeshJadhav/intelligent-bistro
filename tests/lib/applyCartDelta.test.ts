@@ -46,7 +46,7 @@ describe("applyCartDelta", () => {
         },
       ];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
 
       expect(result.applied).toBe(1);
       expect(result.failed).toBe(0);
@@ -65,7 +65,7 @@ describe("applyCartDelta", () => {
         },
       ];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
 
       expect(result.failed).toBe(1);
       expect(result.applied).toBe(0);
@@ -79,7 +79,7 @@ describe("applyCartDelta", () => {
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 1.5 },
       ];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
 
       expect(result.failed).toBe(3);
       expect(result.applied).toBe(0);
@@ -93,7 +93,7 @@ describe("applyCartDelta", () => {
         { type: "ADD_ITEM", itemId: ITEM_D, quantity: 3 }, // yuzu x3
       ];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
 
       expect(result.applied).toBe(3);
       expect(useCartStore.getState().totalItems).toBe(6);
@@ -103,11 +103,11 @@ describe("applyCartDelta", () => {
     it("should increment existing item quantity when adding same item twice", () => {
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 2 },
-      ]);
+      ], useCartStore.getState());
 
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 3 },
-      ]);
+      ], useCartStore.getState());
 
       expect(useCartStore.getState().totalItems).toBe(5);
       expect(useCartStore.getState().items).toHaveLength(1);
@@ -119,12 +119,12 @@ describe("applyCartDelta", () => {
       // Add item first
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 2 },
-      ]);
+      ], useCartStore.getState());
 
       // Remove it
       const result = applyCartDelta([
         { type: "REMOVE_ITEM", itemId: ITEM_A },
-      ]);
+      ], useCartStore.getState());
 
       expect(result.applied).toBe(1);
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -134,7 +134,7 @@ describe("applyCartDelta", () => {
     it("should handle removing non-existent item silently", () => {
       const result = applyCartDelta([
         { type: "REMOVE_ITEM", itemId: "fake-item" },
-      ]);
+      ], useCartStore.getState());
 
       // Remove succeeds but has no effect
       expect(result.applied).toBe(1);
@@ -144,7 +144,7 @@ describe("applyCartDelta", () => {
     it("should reject invalid item IDs", () => {
       const actions: CartAction[] = [{ type: "REMOVE_ITEM", itemId: "" }];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
       expect(result.failed).toBe(1);
     });
   });
@@ -153,7 +153,7 @@ describe("applyCartDelta", () => {
     beforeEach(() => {
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 2 },
-      ]);
+      ], useCartStore.getState());
     });
 
     it("should update item quantity", () => {
@@ -163,7 +163,7 @@ describe("applyCartDelta", () => {
           itemId: ITEM_A,
           quantity: 5,
         },
-      ]);
+      ], useCartStore.getState());
 
       expect(result.applied).toBe(1);
       expect(useCartStore.getState().totalItems).toBe(5);
@@ -176,7 +176,7 @@ describe("applyCartDelta", () => {
           itemId: ITEM_A,
           quantity: 0,
         },
-      ]);
+      ], useCartStore.getState());
 
       expect(result.applied).toBe(1);
       expect(useCartStore.getState().items).toHaveLength(0);
@@ -189,7 +189,7 @@ describe("applyCartDelta", () => {
           itemId: ITEM_A,
           quantity: -1,
         },
-      ]);
+      ], useCartStore.getState());
 
       expect(result.failed).toBe(1);
       // Quantity should remain unchanged
@@ -203,7 +203,7 @@ describe("applyCartDelta", () => {
           itemId: ITEM_A,
           quantity: 2.5,
         },
-      ]);
+      ], useCartStore.getState());
 
       expect(result.failed).toBe(1);
     });
@@ -211,12 +211,12 @@ describe("applyCartDelta", () => {
 
   describe("Edge cases and error handling", () => {
     it("should handle empty action array", () => {
-      const result = applyCartDelta([]);
+      const result = applyCartDelta([], useCartStore.getState());
       expect(result).toEqual({ applied: 0, failed: 0, skipped: 0 });
     });
 
     it("should handle non-array input", () => {
-      const result = applyCartDelta(null as any);
+      const result = applyCartDelta(null as any, useCartStore.getState());
       expect(result).toEqual({ applied: 0, failed: 0, skipped: 0 });
     });
 
@@ -228,7 +228,7 @@ describe("applyCartDelta", () => {
         { type: "ADD_ITEM", itemId: ITEM_B, quantity: 1 },
       ] as any[];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
       expect(result.applied).toBe(2);
       expect(result.skipped).toBe(2);
     });
@@ -240,7 +240,7 @@ describe("applyCartDelta", () => {
         { type: "ADD_ITEM", itemId: ITEM_B, quantity: 1 },        // valid
       ];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
       expect(result.applied).toBe(2);
       expect(result.failed).toBe(1);
       expect(useCartStore.getState().items).toHaveLength(2);
@@ -256,7 +256,7 @@ describe("applyCartDelta", () => {
       ];
 
       // Should not throw
-      expect(() => applyCartDelta(actions)).not.toThrow();
+      expect(() => applyCartDelta(actions, useCartStore.getState())).not.toThrow();
     });
   });
 
@@ -273,7 +273,7 @@ describe("applyCartDelta", () => {
         { type: "ADD_ITEM", itemId: ITEM_E, quantity: 2 },
       ];
 
-      const result = applyCartDelta(actions);
+      const result = applyCartDelta(actions, useCartStore.getState());
 
       expect(result.applied).toBe(5);
       expect(useCartStore.getState().items).toHaveLength(4);
@@ -284,32 +284,32 @@ describe("applyCartDelta", () => {
       // Add item
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 2 },
-      ]);
+      ], useCartStore.getState());
       expect(useCartStore.getState().totalItems).toBe(2);
 
       // Remove item
       applyCartDelta([
         { type: "REMOVE_ITEM", itemId: ITEM_A },
-      ]);
+      ], useCartStore.getState());
       expect(useCartStore.getState().items).toHaveLength(0);
 
       // Add same item again
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 1 },
-      ]);
+      ], useCartStore.getState());
       expect(useCartStore.getState().totalItems).toBe(1);
     });
   });
 
   describe("applyCartDeltaSafe", () => {
     it("should return safe default for non-array input", () => {
-      const result = applyCartDeltaSafe("not an array" as any);
+      const result = applyCartDeltaSafe("not an array" as any, useCartStore.getState());
       expect(result).toEqual({ applied: 0, failed: 0, skipped: 0 });
     });
 
     it("should catch unexpected errors and return safe default", () => {
       // This should not throw
-      expect(() => applyCartDeltaSafe({} as any)).not.toThrow();
+      expect(() => applyCartDeltaSafe({} as any, useCartStore.getState())).not.toThrow();
     });
 
     it("should work correctly with valid input", () => {
@@ -317,7 +317,7 @@ describe("applyCartDelta", () => {
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 1 },
       ];
 
-      const result = applyCartDeltaSafe(actions);
+      const result = applyCartDeltaSafe(actions, useCartStore.getState());
       expect(result.applied).toBe(1);
       expect(useCartStore.getState().items).toHaveLength(1);
     });
@@ -329,7 +329,7 @@ describe("applyCartDelta", () => {
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 2 }, // $14 each = $28
         { type: "ADD_ITEM", itemId: ITEM_B, quantity: 1 }, // $12
-      ]);
+      ], useCartStore.getState());
 
       const state = useCartStore.getState();
       expect(state.totalPrice).toBeCloseTo(40, 1);
@@ -339,7 +339,7 @@ describe("applyCartDelta", () => {
     it("should recalculate total price on quantity update", () => {
       applyCartDelta([
         { type: "ADD_ITEM", itemId: ITEM_A, quantity: 1 },
-      ]);
+      ], useCartStore.getState());
 
       applyCartDelta([
         {
@@ -347,7 +347,7 @@ describe("applyCartDelta", () => {
           itemId: ITEM_A,
           quantity: 3,
         },
-      ]);
+      ], useCartStore.getState());
 
       const state = useCartStore.getState();
       expect(state.totalItems).toBe(3);
