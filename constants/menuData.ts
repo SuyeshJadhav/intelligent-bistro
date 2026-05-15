@@ -1,3 +1,7 @@
+import type { ImageSourcePropType } from "react-native";
+
+import { menuAssets, type MenuAssetKey } from "@/assets/menuAssets";
+
 export type MenuCategory = "Starters" | "Mains" | "Drinks";
 
 export interface MenuItem {
@@ -7,11 +11,16 @@ export interface MenuItem {
   price: number;
   category: MenuCategory;
   imageUrl: string;
+  imageSource: ImageSourcePropType;
 }
+
+type MenuDataEntry = Omit<MenuItem, "imageSource"> & {
+  imageAssetKey: MenuAssetKey;
+};
 
 export const menuCategories = ["All", "Starters", "Mains", "Drinks"] as const;
 
-export const menuData: MenuItem[] = [
+const menuDataWithAssets: MenuDataEntry[] = [
   {
     id: "burrata-salad",
     name: "Burrata & Orchard Tomatoes",
@@ -20,6 +29,7 @@ export const menuData: MenuItem[] = [
     category: "Starters",
     imageUrl:
       "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "burrata-orchard-tomatoes",
   },
   {
     id: "celeriac-soup",
@@ -29,6 +39,7 @@ export const menuData: MenuItem[] = [
     category: "Starters",
     imageUrl:
       "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1200&q=80&sat=-100",
+    imageAssetKey: "smoked-celeriac-soup",
   },
   {
     id: "tagliatelle",
@@ -38,6 +49,7 @@ export const menuData: MenuItem[] = [
     category: "Mains",
     imageUrl:
       "https://images.unsplash.com/photo-1529059997568-3d847b1154f0?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "black-pepper-tagliatelle",
   },
   {
     id: "salmon-bowl",
@@ -47,6 +59,7 @@ export const menuData: MenuItem[] = [
     category: "Mains",
     imageUrl:
       "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "miso-salmon-bowl",
   },
   {
     id: "steak-frites",
@@ -56,6 +69,7 @@ export const menuData: MenuItem[] = [
     category: "Mains",
     imageUrl:
       "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "charred-steak-frites",
   },
   {
     id: "mushroom-risotto",
@@ -65,6 +79,7 @@ export const menuData: MenuItem[] = [
     category: "Mains",
     imageUrl:
       "https://images.unsplash.com/photo-1476124369491-e7addf5db371?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "wild-mushroom-risotto",
   },
   {
     id: "yuzu-spritz",
@@ -74,6 +89,7 @@ export const menuData: MenuItem[] = [
     category: "Drinks",
     imageUrl:
       "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "yuzu-spritz",
   },
   {
     id: "cold-brew",
@@ -83,6 +99,7 @@ export const menuData: MenuItem[] = [
     category: "Drinks",
     imageUrl:
       "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "black-sesame-cold-brew",
   },
   {
     id: "vermouth-soda",
@@ -92,5 +109,13 @@ export const menuData: MenuItem[] = [
     category: "Drinks",
     imageUrl:
       "https://images.unsplash.com/photo-1514361892635-6b07e31e75f2?auto=format&fit=crop&w=1200&q=80",
+    imageAssetKey: "citrus-vermouth-soda",
   },
 ];
+
+export const menuData: MenuItem[] = menuDataWithAssets.map(
+  ({ imageAssetKey, ...item }) => ({
+    ...item,
+    imageSource: menuAssets[imageAssetKey],
+  }),
+);

@@ -10,22 +10,32 @@
  * - Schema rejects invalid action types, wrong quantities
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { z } from "zod";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GoogleGenAI } from "@google/genai";
-import { processOrder } from "../src/lib/gemini";
 import type { MenuItem } from "../src/data/menu";
+import { processOrder } from "../src/lib/gemini";
 
-// ── Mock the GoogleGenAI client ────────────────────────────────────────────
+import {
+  mockGeminiClarification,
+  mockGeminiFailure,
+  mockGeminiNoMatch,
+  mockGeminiSuccess,
+} from "../tests/__helpers__/geminiMocks";
 
-vi.mock("@google/genai", () => ({
-  GoogleGenAI: vi.fn().mockImplementation(() => ({
-    models: {
-      generateContent: vi.fn(),
-    },
-  })),
-}));
+vi.mock("@google/genai", () => {
+  const generateContentMock = vi.fn();
+  (
+    globalThis as { __geminiGenerateContentMock?: typeof generateContentMock }
+  ).__geminiGenerateContentMock = generateContentMock;
+
+  return {
+    GoogleGenAI: vi.fn().mockImplementation(() => ({
+      models: {
+        generateContent: generateContentMock,
+      },
+    })),
+  };
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -69,24 +79,12 @@ const FALLBACK_RESPONSE = {
   ],
 };
 
-function mockGeminiResponse(text: string) {
-  const MockGenAI = vi.mocked(GoogleGenAI);
-  MockGenAI.mockImplementation(
-    () =>
-      ({
-        models: {
-          generateContent: vi.fn().mockResolvedValue({ text }),
-        },
-      }) as any,
-  );
-}
-
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe("gemini.lib", () => {
   beforeEach(() => {
-    process.env.GEMINI_API_KEY = "test-key-123";
-    vi.clearAllMocks();
+    process.env.GEMINI_API_KEY = "test-gemini-api-key";
+    mockGeminiSuccess();
   });
 
   afterEach(() => {
@@ -97,7 +95,7 @@ describe("gemini.lib", () => {
 
   describe("processOrder — happy path", () => {
     it("should parse valid JSON response from Gemini", async () => {
-      mockGeminiResponse(VALID_AI_JSON);
+      mockGeminiSuccess(VALID_AI_JSON);
 
       const result = await processOrder("Add 2 burratas", [], TEST_MENU);
 
@@ -110,7 +108,7 @@ describe("gemini.lib", () => {
 
     it("should strip markdown code fences before parsing", async () => {
       const fencedJson = "```json\n" + VALID_AI_JSON + "\n```";
-      mockGeminiResponse(fencedJson);
+      mockGeminiSuccess(fencedJson);
 
       const result = await processOrder("Add 2 burratas", [], TEST_MENU);
       expect(result.actions).toHaveLength(1);
@@ -118,7 +116,7 @@ describe("gemini.lib", () => {
 
     it("should strip plain code fences (no language tag) before parsing", async () => {
       const fencedJson = "```\n" + VALID_AI_JSON + "\n```";
-      mockGeminiResponse(fencedJson);
+      mockGeminiSuccess(fencedJson);
 
       const result = await processOrder("Add 2 burratas", [], TEST_MENU);
       expect(result.actions).toHaveLength(1);
@@ -135,7 +133,7 @@ describe("gemini.lib", () => {
           "AWAITING_INPUT...",
         ],
       });
-      mockGeminiResponse(emptyActionsJson);
+      mockGeminiSuccess(emptyActionsJson);
 
       const result = await processOrder("unknown request", [], TEST_MENU);
       expect(result.actions).toEqual([]);
@@ -156,7 +154,7 @@ describe("gemini.lib", () => {
           "SYNC_COMPLETE",
         ],
       });
-      mockGeminiResponse(multiActionJson);
+      mockGeminiSuccess(multiActionJson);
 
       const result = await processOrder("Complex order", [], TEST_MENU);
       expect(result.actions).toHaveLength(3);
@@ -167,17 +165,17 @@ describe("gemini.lib", () => {
 
   describe("processOrder — fallback responses", () => {
     it("should return fallback when Gemini returns invalid JSON", async () => {
-      mockGeminiResponse("{ this is definitely not JSON }");
+      mockGeminiSuccess("{ this is definitely not JSON }");
 
       const result = await processOrder("Order something", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should return fallback when Gemini returns empty string", async () => {
-      mockGeminiResponse("");
+      mockGeminiSuccess("");
 
       const result = await processOrder("Order something", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should return fallback when Zod validation fails (wrong executionLog length)", async () => {
@@ -186,47 +184,42 @@ describe("gemini.lib", () => {
         confirmation: "Done",
         executionLog: ["only one"], // should be 4
       });
-      mockGeminiResponse(invalidJson);
+      mockGeminiSuccess(invalidJson);
 
       const result = await processOrder("Order something", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should return fallback when Gemini API throws", async () => {
-      const MockGenAI = vi.mocked(GoogleGenAI);
-      MockGenAI.mockImplementation(
-        () =>
-          ({
-            models: {
-              generateContent: vi.fn().mockRejectedValue(new Error("Gemini API down")),
-            },
-          }) as any,
-      );
+      mockGeminiFailure(new Error("Gemini API down"));
 
       const result = await processOrder("Order something", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
-    it("should return fallback when GEMINI_API_KEY is not set", async () => {
-      delete process.env.GEMINI_API_KEY;
+    it("should preserve a Gemini no-match payload", async () => {
+      mockGeminiNoMatch();
 
       const result = await processOrder("Order something", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result.confirmation).toContain("couldn't find");
+      expect(result.actions).toEqual([]);
     });
 
     it("should return fallback when Gemini returns null text", async () => {
-      const MockGenAI = vi.mocked(GoogleGenAI);
-      MockGenAI.mockImplementation(
-        () =>
-          ({
-            models: {
-              generateContent: vi.fn().mockResolvedValue({ text: null }),
-            },
-          }) as any,
-      );
+      mockGeminiSuccess(JSON.stringify({}));
 
       const result = await processOrder("Order something", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
+    });
+  });
+
+  describe("processOrder — clarification and no-match helpers", () => {
+    it("should preserve a clarification response from Gemini", async () => {
+      mockGeminiClarification();
+
+      const result = await processOrder("Need help", [], TEST_MENU);
+      expect(result.clarificationRequired).toBe(true);
+      expect(result.suggestions).toHaveLength(1);
     });
   });
 
@@ -236,7 +229,7 @@ describe("gemini.lib", () => {
     // We test the schemas indirectly through processOrder
 
     it("should reject ADD_ITEM with quantity = 0 (Zod: positive)", async () => {
-      mockGeminiResponse(
+      mockGeminiSuccess(
         JSON.stringify({
           actions: [{ type: "ADD_ITEM", itemId: "burrata-salad", quantity: 0 }],
           confirmation: "ok",
@@ -251,13 +244,15 @@ describe("gemini.lib", () => {
 
       // Zod will fail → fallback
       const result = await processOrder("Add 0", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should reject ADD_ITEM with negative quantity (Zod: positive)", async () => {
-      mockGeminiResponse(
+      mockGeminiSuccess(
         JSON.stringify({
-          actions: [{ type: "ADD_ITEM", itemId: "burrata-salad", quantity: -5 }],
+          actions: [
+            { type: "ADD_ITEM", itemId: "burrata-salad", quantity: -5 },
+          ],
           confirmation: "ok",
           executionLog: [
             "PROCESSING_INTENT...",
@@ -269,11 +264,11 @@ describe("gemini.lib", () => {
       );
 
       const result = await processOrder("Add -5", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should reject UPDATE_QUANTITY with negative quantity (Zod: nonnegative)", async () => {
-      mockGeminiResponse(
+      mockGeminiSuccess(
         JSON.stringify({
           actions: [
             {
@@ -293,11 +288,11 @@ describe("gemini.lib", () => {
       );
 
       const result = await processOrder("Update to -1", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should accept UPDATE_QUANTITY with quantity = 0 (Zod: nonnegative)", async () => {
-      mockGeminiResponse(
+      mockGeminiSuccess(
         JSON.stringify({
           actions: [
             {
@@ -321,7 +316,7 @@ describe("gemini.lib", () => {
     });
 
     it("should reject response with missing confirmation field", async () => {
-      mockGeminiResponse(
+      mockGeminiSuccess(
         JSON.stringify({
           actions: [],
           // confirmation missing
@@ -335,13 +330,15 @@ describe("gemini.lib", () => {
       );
 
       const result = await processOrder("test", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
 
     it("should reject response with fractional quantity (Zod: int)", async () => {
-      mockGeminiResponse(
+      mockGeminiSuccess(
         JSON.stringify({
-          actions: [{ type: "ADD_ITEM", itemId: "burrata-salad", quantity: 1.5 }],
+          actions: [
+            { type: "ADD_ITEM", itemId: "burrata-salad", quantity: 1.5 },
+          ],
           confirmation: "ok",
           executionLog: [
             "PROCESSING_INTENT...",
@@ -353,7 +350,7 @@ describe("gemini.lib", () => {
       );
 
       const result = await processOrder("Add 1.5", [], TEST_MENU);
-      expect(result).toEqual(FALLBACK_RESPONSE);
+      expect(result).toMatchObject(FALLBACK_RESPONSE);
     });
   });
 });

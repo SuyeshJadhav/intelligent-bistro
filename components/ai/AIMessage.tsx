@@ -21,6 +21,16 @@ export function AIMessage({
 	isExecutingAction = false,
 }: AIMessageProps) {
 	const isUser = message.role === "user";
+	const aiLines = isUser
+		? []
+		: message.content
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
+
+	const isBulletLine = (line: string) => /^(?:•|-)\s+/.test(line);
+
+	const getLineText = (line: string) => line.replace(/^(?:•|-)\s+/, "").trim();
 
 	return (
 		<View
@@ -28,17 +38,46 @@ export function AIMessage({
 		>
 			{/* Message bubble */}
 			<View
-				className={`max-w-xs rounded-2xl px-4 py-3 ${isUser
-						? "bg-primary-text"
-						: "border border-divider bg-surface-elevated"
+				className={`max-w-[80%] rounded-2xl px-4 py-3 ${isUser
+					? "bg-primary-text"
+					: "border border-divider bg-surface-elevated"
 					}`}
 			>
-				<Text
-					className={`font-sans text-base ${isUser ? "text-background" : "text-primary-text"
-						}`}
-				>
-					{message.content}
-				</Text>
+				{isUser ? (
+					<Text className="font-sans text-base leading-6 text-background">
+						{message.content}
+					</Text>
+				) : (
+					<View className="gap-1.5">
+						{aiLines.length > 0 ? (
+							aiLines.map((line, index) => {
+								if (isBulletLine(line)) {
+									return (
+										<View key={`bullet-${index}`} className="flex-row items-start gap-2">
+											<View className="mt-2 h-1.5 w-1.5 rounded-full bg-secondary-text" />
+											<Text className="flex-1 font-sans text-base leading-6 text-primary-text">
+												{getLineText(line)}
+											</Text>
+										</View>
+									);
+								}
+
+								return (
+									<Text
+										key={`line-${index}`}
+										className="font-sans text-base leading-6 text-primary-text"
+									>
+										{line}
+									</Text>
+								);
+							})
+						) : (
+							<Text className="font-sans text-base leading-6 text-primary-text">
+								{message.content}
+							</Text>
+						)}
+					</View>
+				)}
 			</View>
 
 			{/* Loading indicator for AI messages during processing */}

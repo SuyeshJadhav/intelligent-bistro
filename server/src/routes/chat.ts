@@ -7,7 +7,7 @@ import { processOrder } from "../lib/gemini";
 const cartItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  price: z.number(),
+  price: z.number().nonnegative(),
   quantity: z.number().int().nonnegative(),
 });
 
@@ -23,7 +23,10 @@ chatRouter.post("/chat", async (req, res) => {
   const parsed = chatBodySchema.safeParse(req.body);
 
   if (!parsed.success) {
-    console.error("[Chat Route] Validation failed for request body:", parsed.error.format());
+    console.error(
+      "[Chat Route] Validation failed for request body:",
+      parsed.error.format(),
+    );
     return res.status(400).json({ error: "Invalid request body" });
   }
 

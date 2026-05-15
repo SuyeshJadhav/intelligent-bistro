@@ -3,7 +3,15 @@
 const { spawn } = require('child_process');
 
 const [command = 'start', ...args] = process.argv.slice(2);
-const expoArgs = command === 'lint' ? ['expo', 'lint', ...args] : ['expo', 'start', ...args];
+
+function shouldUseTunnel(expoArgs) {
+	return !expoArgs.some((arg) => arg === '--lan' || arg === '--localhost' || arg === '--tunnel');
+}
+
+const expoArgs =
+	command === 'lint'
+		? ['expo', 'lint', ...args]
+		: ['expo', 'start', ...(command === 'start' && shouldUseTunnel(args) ? ['--tunnel'] : []), ...args];
 
 const child = spawn('npx', expoArgs, {
 	stdio: 'inherit',

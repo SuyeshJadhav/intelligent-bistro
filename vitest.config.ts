@@ -71,8 +71,15 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./"),
-    },
+    alias: [
+      {
+        find: "@/assets/menuAssets",
+        replacement: path.resolve(__dirname, "./assets/menuAssets.mock.ts"),
+      },
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "./"),
+      },
+    ],
   },
 });

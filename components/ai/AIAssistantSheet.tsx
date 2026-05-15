@@ -17,25 +17,21 @@
  * 6. Show AI confirmation message
  */
 
+import BottomSheet, { BottomSheetBackdrop, BottomSheetFooter, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { BlurView } from "expo-blur";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-	Pressable,
 	Text,
-	View,
+	View
 } from "react-native";
-import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop, BottomSheetFooter } from '@gorhom/bottom-sheet';
 import Animated, {
 	useAnimatedKeyboard,
-	useAnimatedStyle,
-	useSharedValue,
-	withSpring,
-	withTiming,
+	useAnimatedStyle
 } from "react-native-reanimated";
 
+import { useAIOrchestrator } from "@/hooks/useAIOrchestrator";
 import { requestManager } from "@/lib/requestManager";
 import { useAIStore } from "@/store/aiStore";
-import { useAIOrchestrator } from "@/hooks/useAIOrchestrator";
 
 import { AIInput } from "./AIInput";
 import { AIMessage } from "./AIMessage";
@@ -221,7 +217,9 @@ function AIAssistantFooter(props: any) {
 				<AIInput
 					value={input}
 					onChangeText={setInput}
-					onSend={handleSend}
+					onSend={() => {
+						void handleSend();
+					}}
 					isDisabled={isProcessing}
 				/>
 			</Animated.View>

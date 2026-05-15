@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node ./scripts/run-expo.js start",
+    "tunnel:start": "node ./scripts/start-with-ngrok.js",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "node ./scripts/run-expo.js start --android",
     "ios": "node ./scripts/run-expo.js start --ios",
@@ -40,6 +41,7 @@
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
+    "fuse.js": "^6.6.2",
     "nativewind": "^4.2.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -61,6 +63,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "msw": "^2.14.6",
+    "ngrok": "^4.3.0",
     "typescript": "~5.9.2",
     "vitest": "^2.1.9"
   },

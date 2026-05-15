@@ -2,7 +2,13 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 
 import type { MenuItem } from "../data/menu";
-import { resolveMenuMatches } from "./fuzzyMatch";
+import type { ResolveResult } from "./fuzzyMatch";
+import { resolveMenuMatchesWithScores } from "./fuzzyMatch";
+
+interface Modifier {
+  type: string;
+  value: string;
+}
 
 export interface CartItem {
   id: string;
@@ -36,45 +42,52 @@ const cartActionSchema = z.union([
 
 export type CartAction = z.infer<typeof cartActionSchema>;
 
+const suggestionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  tags: z.array(z.string()).optional(),
+  dietary: z.array(z.string()).optional(),
+});
+
 const aiResponseSchema = z.object({
   actions: z.array(cartActionSchema),
   confirmation: z.string(),
   executionLog: z.array(z.string()).length(4),
+  clarificationRequired: z.boolean().optional(),
+  suggestions: z.array(suggestionSchema).optional(),
 });
 
 export type AIResponse = z.infer<typeof aiResponseSchema>;
 
-const SYSTEM_PROMPT = `You are the AI ordering assistant for The Intelligent Bistro, a premium restaurant.
-Your job is to interpret the user's natural language order intent and return structured JSON.
+const SYSTEM_PROMPT = `You are the AI ordering assistant for The Intelligent Bistro, acting as a planner.
+The backend WILL provide a list of resolved entity candidates (id + confidence). Your job is to RETURN a normalized intent graph describing the user's intent.
 
-You have access to the current menu and the user's current cart state.
-You must ONLY reference items that exist in the menu by their exact id.
-Never hallucinate menu items.
+ABSOLUTELY DO NOT GUESS, INVENT, OR SUBSTITUTE MENU ITEMS.
+- Do NOT perform fuzzy matching beyond the provided resolver results.
+- Do NOT invent recommendations, categories, or semantic equivalents.
+- Do NOT assume "closest category" or make category-level substitutions.
 
-Always respond with this exact JSON shape and nothing else:
+If no exact or HIGH-CONFIDENCE menu match exists, return NO_MATCH according to the backend contract (do not create or infer items).
+
+Return EXACTLY this JSON and nothing else:
 {
-  "actions": [
-    { "type": "ADD_ITEM", "itemId": string, "quantity": number },
-    { "type": "REMOVE_ITEM", "itemId": string },
-    { "type": "UPDATE_QUANTITY", "itemId": string, "quantity": number }
+  "intentGraph": [
+    {
+      "intent": "ADD" | "REMOVE" | "UPDATE",
+      "targets": [
+        {
+          "raw": string,
+          "resolvedId": string | null,
+          "label": string | null,
+          "confidence": number | null,
+          "quantity": number | null,
+          "modifiers": [{ "type": string, "value": string }] | null
+        }
+      ]
+    }
   ],
-  "confirmation": string,
-  "executionLog": [
-    "PROCESSING_INTENT...",
-    "VALIDATING_MENU...",
-    "UPDATING_STATE...",
-    "SYNC_COMPLETE"
-  ]
-}
-
-If the user's request is unclear or references items not on the menu, return:
-{
-  "actions": [],
-  "confirmation": "I couldn't find that item on our menu. Here's what we have: [list relevant categories].",
-  "executionLog": ["PROCESSING_INTENT...", "VALIDATING_MENU...", "NO_MATCH_FOUND", "AWAITING_INPUT..."]
-}
-
-Never include markdown, explanation, or any text outside the JSON object.`;
+  "confirmation": string
+}`;
 
 const FALLBACK_RESPONSE: AIResponse = {
   actions: [],
@@ -86,6 +99,8 @@ const FALLBACK_RESPONSE: AIResponse = {
     "NO_MATCH_FOUND",
     "AWAITING_INPUT...",
   ],
+  clarificationRequired: false,
+  suggestions: [],
 };
 
 function stripMarkdownFences(text: string): string {
@@ -120,17 +135,121 @@ function buildUserPrompt(
   userMessage: string,
   cartState: CartItem[],
   menuItems: MenuItem[],
+  resolverResult?: ResolveResult,
 ): string {
-  return [
+  const parts: string[] = [
     "User message:",
     userMessage,
+    "",
+    "Resolved entities (backend):",
+  ];
+
+  if (resolverResult && resolverResult.matches.length > 0) {
+    for (const m of resolverResult.matches) {
+      parts.push(
+        `- raw: ${m.raw} | resolvedId: ${m.resolvedId} | label: ${m.label} | confidence: ${Math.round(
+          m.confidence * 100,
+        )}%`,
+      );
+    }
+  } else {
+    parts.push("- (none)");
+  }
+
+  parts.push(
     "",
     "Menu:",
     buildMenuContext(menuItems),
     "",
     "Current cart:",
     buildCartContext(cartState),
-  ].join("\n");
+  );
+  return parts.join("\n");
+}
+
+// Planner response schema (intent graph)
+const targetSchema = z.object({
+  raw: z.string(),
+  resolvedId: z.string().nullable().optional(),
+  label: z.string().nullable().optional(),
+  confidence: z.number().min(0).max(1).nullable().optional(),
+  quantity: z.number().int().nullable().optional(),
+  modifiers: z
+    .array(z.object({ type: z.string(), value: z.string() }))
+    .nullable()
+    .optional(),
+});
+
+const intentSchema = z.object({
+  intent: z.string(),
+  targets: z.array(targetSchema),
+});
+const plannerResponseSchema = z.object({
+  intentGraph: z.array(intentSchema),
+  confirmation: z.string(),
+});
+
+/**
+ * Helper: compile a planner response (intent graph) into AIResponse actions and telemetry.
+ * Exported for unit testing and for callers that want to separate planning from execution.
+ */
+export function compilePlannerResponse(
+  plannerResp: z.infer<typeof plannerResponseSchema>,
+  resolverResult?: ResolveResult,
+): AIResponse {
+  const compiledActions: CartAction[] = [];
+  for (const node of plannerResp.intentGraph) {
+    const intent = node.intent.toUpperCase();
+    for (const t of node.targets) {
+      const qty =
+        typeof t.quantity === "number" && t.quantity > 0 ? t.quantity : 1;
+      if (intent === "ADD" && t.resolvedId) {
+        compiledActions.push({
+          type: "ADD_ITEM",
+          itemId: t.resolvedId,
+          quantity: qty,
+          modifiers: (t as any).modifiers as Modifier[] | undefined,
+        } as CartAction);
+      } else if (intent === "REMOVE" && t.resolvedId) {
+        compiledActions.push({ type: "REMOVE_ITEM", itemId: t.resolvedId });
+      } else if (
+        intent === "UPDATE" &&
+        t.resolvedId &&
+        typeof t.quantity === "number"
+      ) {
+        compiledActions.push({
+          type: "UPDATE_QUANTITY",
+          itemId: t.resolvedId,
+          quantity: t.quantity,
+        });
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  const telemetry = [
+    `${now} - ENTITY_RESOLUTION_COMPLETE`,
+    `${now} - MATCH_CONFIDENCE: ${
+      resolverResult && resolverResult.matches.length > 0
+        ? Math.round(resolverResult.matches[0].confidence * 100) + "%"
+        : "N/A"
+    }`,
+    `${now} - ACTION_GRAPH_VALIDATED`,
+    `${now} - STATE_SYNCHRONIZED`,
+  ] as [string, string, string, string];
+
+  return {
+    actions: compiledActions,
+    confirmation: plannerResp.confirmation,
+    executionLog: telemetry,
+  };
+}
+
+// Deterministic helper to filter menu items by dietary tag
+export function filterMenuByDietary(menuItems: MenuItem[], diet: string) {
+  return menuItems.filter((it) =>
+    (it.dietary || []).map((d) => d.toLowerCase()).includes(diet.toLowerCase()),
+  );
 }
 
 async function callGemini(prompt: string): Promise<string> {
@@ -141,7 +260,9 @@ async function callGemini(prompt: string): Promise<string> {
   }
 
   try {
-    console.log("[Gemini Lib] Initializing GoogleGenAI client and sending request...");
+    console.log(
+      "[Gemini Lib] Initializing GoogleGenAI client and sending request...",
+    );
     const client = new GoogleGenAI({ apiKey });
     const result = await client.models.generateContent({
       model: "gemini-3.1-flash-lite",
@@ -161,7 +282,8 @@ async function callGemini(prompt: string): Promise<string> {
   }
 }
 
-
+const HIGH_CONFIDENCE = 0.9;
+const MEDIUM_CONFIDENCE = 0.7;
 
 export async function processOrder(
   userMessage: string,
@@ -170,13 +292,84 @@ export async function processOrder(
 ): Promise<AIResponse> {
   try {
     console.log("[Gemini Lib] processOrder started. userMessage:", userMessage);
-    
-    const resolvedMessage = resolveMenuMatches(userMessage, menuItems);
-    if (resolvedMessage !== userMessage) {
-        console.log("[Gemini Lib] Semantic match resolved message to:", resolvedMessage);
+    const resolverResult = resolveMenuMatchesWithScores(userMessage, menuItems);
+    if (resolverResult.matches.length > 0) {
+      console.log(
+        "[Gemini Lib] Resolver matched spans:",
+        resolverResult.matches,
+      );
     }
-    
-    const userPrompt = buildUserPrompt(resolvedMessage, cartState, menuItems);
+
+    // Only short-circuit to NO_MATCH for explicit out-of-domain queries
+    // (e.g. cola, pizza) or for dietary requests that have no matching items.
+    const userLower = userMessage.toLowerCase();
+    const EXPLICIT_NO_MATCH = ["cola", "pizza", "fries", "tacos"];
+    const requestsNoMatchTerm = EXPLICIT_NO_MATCH.some((w) =>
+      userLower.includes(w),
+    );
+
+    // Dietary-specific handling (deterministic)
+    const asksForVegan = /\bvegan\b/.test(userLower);
+    if (
+      requestsNoMatchTerm ||
+      (asksForVegan && filterMenuByDietary(menuItems, "vegan").length === 0)
+    ) {
+      const userTokens = userMessage
+        .toLowerCase()
+        .split(/\s+/)
+        .map((s) => s.replace(/[^\w-]/g, ""))
+        .filter(Boolean);
+
+      const suggestions = menuItems
+        .filter((it) => {
+          const hay = [
+            it.name,
+            ...(it.aliases || []),
+            ...(it.keywords || []),
+            ...(it.tags || []),
+          ]
+            .join(" ")
+            .toLowerCase();
+          return userTokens.some((t) => hay.includes(t));
+        })
+        .slice(0, 5)
+        .map((it) => ({
+          id: it.id,
+          name: it.name,
+          tags: it.tags,
+          dietary: it.dietary,
+        }));
+
+      const finalSuggestions =
+        suggestions.length > 0
+          ? suggestions
+          : menuItems.slice(0, 5).map((it) => ({
+              id: it.id,
+              name: it.name,
+              tags: it.tags,
+              dietary: it.dietary,
+            }));
+
+      return {
+        actions: [],
+        clarificationRequired: false,
+        confirmation: "I couldn't find that item on our current menu.",
+        suggestions: finalSuggestions,
+        executionLog: [
+          new Date().toISOString() + " - ENTITY_RESOLUTION_COMPLETE",
+          new Date().toISOString() + " - MATCH_CONFIDENCE: N/A",
+          new Date().toISOString() + " - NO_HIGH_CONFIDENCE_MATCH",
+          new Date().toISOString() + " - AWAITING_INPUT...",
+        ],
+      } as AIResponse;
+    }
+
+    const userPrompt = buildUserPrompt(
+      userMessage,
+      cartState,
+      menuItems,
+      resolverResult,
+    );
     console.log("[Gemini Lib] Generated User Prompt:\n", userPrompt);
 
     const rawText = await callGemini(userPrompt);
@@ -186,13 +379,106 @@ export async function processOrder(
     console.log("[Gemini Lib] Cleaned JSON string:\n", cleaned);
 
     const parsed = JSON.parse(cleaned) as unknown;
-    console.log("[Gemini Lib] Successfully parsed JSON:", parsed);
+    console.log("[Gemini Lib] Parsed planner response:", parsed);
 
-    const validated = aiResponseSchema.parse(parsed);
-    console.log("[Gemini Lib] Successfully validated AI response schema");
-    return validated;
+    // The LLM may return either a planner intent graph (preferred) or a direct
+    // AIResponse (actions array). Accept either deterministically.
+    const planner = plannerResponseSchema.safeParse(parsed);
+    let plannerResp: z.infer<typeof plannerResponseSchema> | null = null;
+    let aiRespParsed: z.infer<typeof aiResponseSchema> | null = null;
+
+    if (planner.success) {
+      plannerResp = planner.data;
+    } else {
+      const aiParsed = aiResponseSchema.safeParse(parsed);
+      if (aiParsed.success) {
+        aiRespParsed = aiParsed.data;
+      } else {
+        console.error(
+          "[Gemini Lib] Response failed both planner and ai schemas:",
+          planner.error?.format(),
+          aiParsed.error?.format?.(),
+        );
+        return FALLBACK_RESPONSE;
+      }
+    }
+
+    // If we received a planner response, compile it into actions
+    const compiledActions: CartAction[] = [];
+    if (plannerResp) {
+      for (const node of plannerResp.intentGraph) {
+        const intent = node.intent.toUpperCase();
+        for (const t of node.targets) {
+          const qty =
+            typeof t.quantity === "number" && t.quantity > 0 ? t.quantity : 1;
+          if (intent === "ADD" && t.resolvedId) {
+            compiledActions.push({
+              type: "ADD_ITEM",
+              itemId: t.resolvedId,
+              quantity: qty,
+              modifiers: (t as any).modifiers as Modifier[] | undefined,
+            } as CartAction);
+          } else if (intent === "REMOVE" && t.resolvedId) {
+            compiledActions.push({ type: "REMOVE_ITEM", itemId: t.resolvedId });
+          } else if (
+            intent === "UPDATE" &&
+            t.resolvedId &&
+            typeof t.quantity === "number"
+          ) {
+            compiledActions.push({
+              type: "UPDATE_QUANTITY",
+              itemId: t.resolvedId,
+              quantity: t.quantity,
+            });
+          }
+        }
+      }
+    }
+
+    // Build execution log with simple telemetry entries
+    const now = new Date().toISOString();
+    const telemetry = [
+      `${now} - ENTITY_RESOLUTION_COMPLETE`,
+      `${now} - MATCH_CONFIDENCE: ${
+        resolverResult.matches.length > 0
+          ? Math.round(resolverResult.matches[0].confidence * 100) + "%"
+          : "N/A"
+      }`,
+      `${now} - ACTION_GRAPH_VALIDATED`,
+      `${now} - STATE_SYNCHRONIZED`,
+    ] as [string, string, string, string];
+
+    const aiResp: any = aiRespParsed
+      ? {
+          ...aiRespParsed,
+        }
+      : {
+          actions: compiledActions,
+          confirmation: plannerResp!.confirmation,
+          executionLog: telemetry,
+        };
+
+    // If resolver had ambiguous/low-confidence matches, include them for client-side clarification
+    if (resolverResult && resolverResult.matches.length > 0) {
+      const lowMatches = resolverResult.matches.filter(
+        (m) => m.confidence < HIGH_CONFIDENCE,
+      );
+      if (lowMatches.length > 0) {
+        aiResp.clarificationChoices = lowMatches.map((m) => ({
+          raw: m.raw,
+          resolvedId: m.resolvedId,
+          label: m.label,
+          confidence: m.confidence,
+        }));
+      }
+    }
+
+    return aiResp as AIResponse;
   } catch (error) {
-    console.error("[Gemini Lib] Error encountered during processOrder. Returning fallback response. Error details:", error);
+    console.error(
+      "[Gemini Lib] Error encountered during processOrder. Returning fallback response. Error details:",
+      error,
+    );
     return FALLBACK_RESPONSE;
   }
 }

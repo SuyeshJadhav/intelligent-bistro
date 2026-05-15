@@ -1,5 +1,5 @@
-import { Image } from 'expo-image';
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, Text, View } from 'react-native';
 
 import type { MenuItem } from '@/constants/menuData';
 import { useCartStore } from '@/store/cartStore';
@@ -9,6 +9,7 @@ type MenuCardProps = {
 };
 
 export function MenuCard({ item }: MenuCardProps) {
+	const [useRemoteFallback, setUseRemoteFallback] = useState(false);
 	const addItem = useCartStore((state) => state.addItem);
 	const updateQuantity = useCartStore((state) => state.updateQuantity);
 	const quantity = useCartStore(
@@ -31,9 +32,10 @@ export function MenuCard({ item }: MenuCardProps) {
 	return (
 		<View className="overflow-hidden rounded-2xl border border-divider bg-surface">
 			<Image
-				source={{ uri: item.imageUrl }}
-				contentFit="cover"
-				className="aspect-[4/3] w-full"
+				source={useRemoteFallback ? { uri: item.imageUrl } : item.imageSource}
+				resizeMode="cover"
+				onError={() => setUseRemoteFallback(true)}
+				style={{ width: '100%', height: 160, backgroundColor: '#F1EDEC' }}
 			/>
 
 			<View className="p-6">

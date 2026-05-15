@@ -1,74 +1,172 @@
+import Fuse from "fuse.js";
 import type { MenuItem } from "../data/menu";
 
-export function levenshteinDistance(a: string, b: string): number {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
-  for (let i = 0; i <= a.length; i += 1) matrix[i][0] = i;
-  for (let j = 0; j <= b.length; j += 1) matrix[0][j] = j;
-  for (let i = 1; i <= a.length; i += 1) {
-    for (let j = 1; j <= b.length; j += 1) {
-      const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + indicator
-      );
-    }
-  }
-  return matrix[a.length][b.length];
+export interface MatchCandidate {
+  raw: string;
+  resolvedId: string;
+  label: string;
+  score: number; // Fuse score (0 exact, 1 worst)
+  confidence: number; // 0..1 (1-best)
+  spanStart: number;
+  spanEnd: number; // exclusive
 }
 
-export function resolveMenuMatches(text: string, menuItems: MenuItem[]): string {
-  let resolvedText = text;
-  const sortedItems = [...menuItems].sort((a, b) => b.name.length - a.name.length);
+export interface ResolveResult {
+  resolvedText: string;
+  matches: MatchCandidate[];
+}
+
+function normalize(s: string) {
+  return s.toLowerCase().replace(/[^\w\s-]/g, "");
+}
+
+/**
+ * Resolve menu-like spans in the input text using Fuse.js.
+ * Returns both the resolved text and a list of match candidates with scores/confidence.
+ */
+export function resolveMenuMatchesWithScores(
+  text: string,
+  menuItems: MenuItem[],
+): ResolveResult {
   const words = text.split(/\s+/);
   const matchedIndices = new Set<number>();
-  
+  let resolvedText = text;
+  const matches: MatchCandidate[] = [];
+
+  // Build Fuse index over candidate keys (name and id)
+  const fuse = new Fuse(menuItems, {
+    keys: ["name", "id"],
+    includeScore: true,
+    threshold: 0.6,
+    ignoreLocation: true,
+    useExtendedSearch: false,
+  });
+
+  // Words we will never auto-resolve via fuzzy match (too generic or out-of-domain)
+  const FUZZY_BLACKLIST = new Set([
+    "cola",
+    "pizza",
+    "fries",
+    "tacos",
+    "coke",
+    "pepsi",
+    "soda",
+  ]);
+
+  // Common stopwords that should never be resolved to menu items
+  const STOPWORDS = new Set([
+    "add",
+    "want",
+    "please",
+    "i",
+    "would",
+    "like",
+    "get",
+    "a",
+    "an",
+    "the",
+    "to",
+    "my",
+    "for",
+    "with",
+    "and",
+    "of",
+  ]);
+
+  // ngram scan (4..1) to prefer longer spans
   for (let n = 4; n >= 1; n--) {
     for (let i = 0; i <= words.length - n; i++) {
       let overlap = false;
-      for (let k = i; k < i + n; k++) {
-        if (matchedIndices.has(k)) overlap = true;
-      }
+      for (let k = i; k < i + n; k++) if (matchedIndices.has(k)) overlap = true;
       if (overlap) continue;
-      
+
       const ngram = words.slice(i, i + n).join(" ");
-      const normalizedNgram = ngram.toLowerCase().replace(/[^\w\s]/g, "");
-      
-      if (normalizedNgram.length < 3) continue;
-      
-      let bestMatch: MenuItem | null = null;
-      let bestDistance = Infinity;
-      
-      for (const item of sortedItems) {
-        const targetName = item.name.toLowerCase().replace(/[^\w\s]/g, "");
-        const targetId = item.id.toLowerCase().replace(/-/g, " ");
-        
-        const distName = levenshteinDistance(normalizedNgram, targetName);
-        const distId = levenshteinDistance(normalizedNgram, targetId);
-        
-        const minDist = Math.min(distName, distId);
-        const threshold = Math.max(1, Math.floor(Math.max(targetName.length, targetId.length) * 0.3));
-        
-        if (minDist <= threshold && minDist < bestDistance) {
-          if (minDist <= Math.floor(normalizedNgram.length * 0.5)) {
-             bestDistance = minDist;
-             bestMatch = item;
+      const normalizedNgram = normalize(ngram);
+      if (normalizedNgram.length < 2) continue;
+
+      if (STOPWORDS.has(normalizedNgram)) continue;
+
+      // Explicit alias / exact matching first (deterministic)
+      let aliasMatched = false;
+      for (const item of menuItems) {
+        if (!item.aliases || item.aliases.length === 0) continue;
+        for (const a of item.aliases) {
+          if (normalize(a) === normalizedNgram) {
+            const escaped = ngram.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const regex = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "i");
+            if (!regex.test(resolvedText)) continue;
+            resolvedText = resolvedText.replace(regex, item.id);
+            for (let k = i; k < i + n; k++) matchedIndices.add(k);
+            matches.push({
+              raw: ngram,
+              resolvedId: item.id,
+              label: item.name,
+              score: 0,
+              confidence: 1,
+              spanStart: i,
+              spanEnd: i + n,
+            });
+            aliasMatched = true;
+            break;
           }
         }
+        if (aliasMatched) break;
       }
-      
-      if (bestMatch) {
-        const escapedNgram = ngram.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`(?<![\\w])${escapedNgram}(?![\\w])`, "i");
-        if (regex.test(resolvedText)) {
-            resolvedText = resolvedText.replace(regex, bestMatch.id);
-            for (let k = i; k < i + n; k++) matchedIndices.add(k);
-        }
-      }
+      if (aliasMatched) continue;
+
+      // Reject clearly out-of-domain short tokens
+      if (FUZZY_BLACKLIST.has(normalizedNgram)) continue;
+
+      const results = fuse.search(normalizedNgram, { limit: 3 });
+      if (!results || results.length === 0) continue;
+
+      // Choose best candidate deterministically: lowest score, then by id
+      results.sort((a, b) => {
+        if (a.score! < b.score!) return -1;
+        if (a.score! > b.score!) return 1;
+        return a.item.id.localeCompare(b.item.id);
+      });
+
+      const best = results[0];
+      if (!best) continue;
+
+      // Convert Fuse score (0..1) to confidence (1 - score), clamp
+      const score = typeof best.score === "number" ? best.score : 1;
+      const confidence = Math.max(0, Math.min(1, 1 - score));
+
+      // Stricter minimum confidence thresholds to avoid semantic guessing
+      const minConfidence = normalizedNgram.length <= 2 ? 0.95 : 0.8;
+      if (confidence < minConfidence) continue;
+
+      const item = best.item;
+
+      // Replace in resolvedText using word boundaries for the original ngram
+      const escaped = ngram.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "i");
+      if (!regex.test(resolvedText)) continue;
+
+      resolvedText = resolvedText.replace(regex, item.id);
+      for (let k = i; k < i + n; k++) matchedIndices.add(k);
+
+      matches.push({
+        raw: ngram,
+        resolvedId: item.id,
+        label: item.name,
+        score,
+        confidence,
+        spanStart: i,
+        spanEnd: i + n,
+      });
     }
   }
-  
-  return resolvedText;
+
+  return { resolvedText, matches };
+}
+
+// Backwards-compatible wrapper
+export function resolveMenuMatches(
+  text: string,
+  menuItems: MenuItem[],
+): string {
+  return resolveMenuMatchesWithScores(text, menuItems).resolvedText;
 }

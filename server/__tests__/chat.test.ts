@@ -18,8 +18,27 @@
 import type { Express } from "express";
 import express from "express";
 import request from "supertest";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import chatRouter from "../src/routes/chat";
+
+vi.mock("../src/lib/gemini", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/lib/gemini")>();
+  return {
+    ...actual,
+    processOrder: vi.fn().mockResolvedValue({
+      actions: [],
+      confirmation: "I couldn't find that item on our current menu.",
+      executionLog: [
+        "PROCESSING_INTENT...",
+        "VALIDATING_MENU...",
+        "NO_MATCH_FOUND",
+        "AWAITING_INPUT...",
+      ],
+      clarificationRequired: false,
+      suggestions: [],
+    }),
+  };
+});
 
 let app: Express;
 

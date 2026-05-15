@@ -6,6 +6,11 @@ export interface MenuItem {
   description: string;
   price: number;
   category: MenuCategory;
+  // Optional structured metadata for deterministic recommendations
+  tags?: string[];
+  dietary?: string[];
+  aliases?: string[];
+  keywords?: string[];
 }
 
 export const menuItems: MenuItem[] = [
@@ -50,6 +55,9 @@ export const menuItems: MenuItem[] = [
     description: "Creamy arborio rice with roasted mushrooms and thyme.",
     price: 26,
     category: "Mains",
+    tags: ["vegetarian", "creamy", "savory"],
+    dietary: ["vegetarian"],
+    aliases: ["risotto"],
   },
   {
     id: "yuzu-spritz",
@@ -57,6 +65,8 @@ export const menuItems: MenuItem[] = [
     description: "Bright citrus spritz with sparkling wine and herbs.",
     price: 11,
     category: "Drinks",
+    tags: ["citrus", "sparkling"],
+    aliases: ["yuzu spritz", "yuzu spritz"],
   },
   {
     id: "cold-brew",
