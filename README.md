@@ -2,8 +2,6 @@
 
 Intelligent Bistro is a high-fidelity mobile application that redefines the restaurant ordering experience. It combines a visually stunning, premium menu browsing interface with a state-of-the-art conversational AI assistant. Users can seamlessly order food using natural language (e.g., "Add two spicy chicken sandwiches and a large water"), and the AI interprets the intent to automatically update a highly responsive shopping cart in real-time.
 
-[**Watch the Loom Walkthrough here**](#) *(Link coming soon)*
-
 ## Architecture Overview
 
 The app operates on a deterministic, robust pipeline:
