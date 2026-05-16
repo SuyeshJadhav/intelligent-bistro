@@ -184,6 +184,7 @@ const intentSchema = z.object({
   intent: z.string(),
   targets: z.array(targetSchema),
 });
+
 const plannerResponseSchema = z.object({
   intentGraph: z.array(intentSchema),
   confirmation: z.string(),
@@ -229,10 +230,9 @@ export function compilePlannerResponse(
   const now = new Date().toISOString();
   const telemetry = [
     `${now} - ENTITY_RESOLUTION_COMPLETE`,
-    `${now} - MATCH_CONFIDENCE: ${
-      resolverResult && resolverResult.matches.length > 0
-        ? Math.round(resolverResult.matches[0].confidence * 100) + "%"
-        : "N/A"
+    `${now} - MATCH_CONFIDENCE: ${resolverResult && resolverResult.matches.length > 0
+      ? Math.round(resolverResult.matches[0].confidence * 100) + "%"
+      : "N/A"
     }`,
     `${now} - ACTION_GRAPH_VALIDATED`,
     `${now} - STATE_SYNCHRONIZED`,
@@ -344,11 +344,11 @@ export async function processOrder(
         suggestions.length > 0
           ? suggestions
           : menuItems.slice(0, 5).map((it) => ({
-              id: it.id,
-              name: it.name,
-              tags: it.tags,
-              dietary: it.dietary,
-            }));
+            id: it.id,
+            name: it.name,
+            tags: it.tags,
+            dietary: it.dietary,
+          }));
 
       return {
         actions: [],
@@ -439,10 +439,9 @@ export async function processOrder(
     const now = new Date().toISOString();
     const telemetry = [
       `${now} - ENTITY_RESOLUTION_COMPLETE`,
-      `${now} - MATCH_CONFIDENCE: ${
-        resolverResult.matches.length > 0
-          ? Math.round(resolverResult.matches[0].confidence * 100) + "%"
-          : "N/A"
+      `${now} - MATCH_CONFIDENCE: ${resolverResult.matches.length > 0
+        ? Math.round(resolverResult.matches[0].confidence * 100) + "%"
+        : "N/A"
       }`,
       `${now} - ACTION_GRAPH_VALIDATED`,
       `${now} - STATE_SYNCHRONIZED`,
@@ -450,13 +449,13 @@ export async function processOrder(
 
     const aiResp: any = aiRespParsed
       ? {
-          ...aiRespParsed,
-        }
+        ...aiRespParsed,
+      }
       : {
-          actions: compiledActions,
-          confirmation: plannerResp!.confirmation,
-          executionLog: telemetry,
-        };
+        actions: compiledActions,
+        confirmation: plannerResp!.confirmation,
+        executionLog: telemetry,
+      };
 
     // If resolver had ambiguous/low-confidence matches, include them for client-side clarification
     if (resolverResult && resolverResult.matches.length > 0) {

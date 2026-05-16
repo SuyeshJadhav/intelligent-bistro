@@ -28,7 +28,9 @@ The app operates on a deterministic, robust pipeline:
 - Expo CLI (`npm install -g expo-cli`)
 - Google Gemini API Key
 
-## Setup Instructions
+## Running Locally on Your Device
+
+Want to test Intelligent Bistro on your own phone or local emulator? Follow these instructions to spin up the backend server and start the React Native app.
 
 ### 1. Clone the repository
 ```bash
@@ -45,6 +47,7 @@ npm install
 ### 3. Environment Configuration
 Create a `.env` file in the root directory based on `.env.example` (or configure the following):
 ```env
+# If using a physical device via Expo Go, replace `localhost` with your computer's local IP address (e.g., 192.168.1.X)
 EXPO_PUBLIC_API_URL=http://localhost:3000
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
@@ -59,9 +62,10 @@ npm run dev --prefix server
 *(The server runs on port 3000 by default)*
 
 ### 5. Start the Expo Application
-Run the Expo application in your simulator or physical device.
+Run the Expo application in your simulator or scan the QR code with the Expo Go app on your physical device.
 ```bash
 # In your main terminal window:
 npx expo start
 ```
-Press `i` to open iOS simulator or `a` to open Android emulator.
+- **Physical Device:** Download the "Expo Go" app on iOS or Android, and scan the QR code shown in the terminal.
+- **Simulator:** Press `i` to open iOS simulator or `a` to open Android emulator.

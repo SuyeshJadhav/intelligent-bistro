@@ -21,7 +21,14 @@ import { menuData } from "@/constants/menuData";
 import type { CartAction } from "@/lib/types";
 
 export interface CartStoreMethods {
-  addItem: (item: { id: string; name: string; price: number; quantity: number; description: string; imageUrl: string }) => void;
+  addItem: (item: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    description: string;
+    imageUrl: string;
+  }) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
 }
@@ -46,7 +53,10 @@ function validateMenuItem(itemId: string): boolean {
  * - Quantity bounds checking
  * - Silent failure (returns false) for invalid actions
  */
-function applySingleAction(action: CartAction, store: CartStoreMethods): boolean {
+function applySingleAction(
+  action: CartAction,
+  store: CartStoreMethods,
+): boolean {
   switch (action.type) {
     case "ADD_ITEM": {
       // Validate item exists in menu
@@ -161,7 +171,10 @@ function applySingleAction(action: CartAction, store: CartStoreMethods): boolean
  * applyCartDelta(response.actions);
  * ```
  */
-export function applyCartDelta(actions: CartAction[], store: CartStoreMethods): {
+export function applyCartDelta(
+  actions: CartAction[],
+  store: CartStoreMethods,
+): {
   applied: number;
   failed: number;
   skipped: number;
@@ -218,7 +231,10 @@ export function applyCartDelta(actions: CartAction[], store: CartStoreMethods): 
  *
  * Use this when you're not 100% sure about the response shape.
  */
-export function applyCartDeltaSafe(actions: unknown, store: CartStoreMethods): {
+export function applyCartDeltaSafe(
+  actions: unknown,
+  store: CartStoreMethods,
+): {
   applied: number;
   failed: number;
   skipped: number;

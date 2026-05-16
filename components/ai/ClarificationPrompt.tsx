@@ -3,8 +3,8 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 export default function ClarificationPrompt() {
-	const choices = useAIStore((s) => s.clarificationChoices ?? []);
-	const accept = useAIStore((s) => (s as any).acceptClarification);
+	const choices = useAIStore((s) => s.clarificationChoices);
+	const accept = useAIStore((s) => s.acceptClarification as any);
 
 	if (!choices || choices.length === 0) return null;
 

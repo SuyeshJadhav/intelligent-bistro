@@ -87,3 +87,7 @@ Environment:
 - The AI overlay in the app still uses a mock send flow; I can wire it to call `POST /api/chat` and apply returned `actions` to the frontend cart store next.
 - We should lock down CORS and add authentication for production later.
 - The menu image filenames currently use the original descriptive names; they work, but kebab-case names would be easier to maintain long-term.
+
+## 2026-05-15 Fixes
+
+- Fixed a bug in the AI confirmation flow where accepting a clarification (e.g. replying "yes" after "add pasta") could cause the wrong item to be added. The orchestrator now treats short affirmative or numeric replies as clarification acceptance and preserves the request context; `applyCartDelta` was hardened to resolve human-readable menu names to menu ids. Added unit and integration tests to cover the scenario.

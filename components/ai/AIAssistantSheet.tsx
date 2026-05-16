@@ -35,6 +35,7 @@ import { useAIStore } from "@/store/aiStore";
 
 import { AIInput } from "./AIInput";
 import { AIMessage } from "./AIMessage";
+import ClarificationPrompt from "./ClarificationPrompt";
 import { ExecutionLog } from "./ExecutionLog";
 
 /**
@@ -181,6 +182,9 @@ export function AIAssistantSheet() {
 							}
 						/>
 					))}
+
+					{/* Clarification prompt (if any) */}
+					<ClarificationPrompt />
 
 					{/* Execution log */}
 					{executionLog.length > 0 && (
